@@ -159,19 +159,17 @@ ENDWELCOME
   print WELCOME "$welcome\n";
   close WELCOME;
   system "mail -s \"VAP - $subject\" $email < $create";
-  #system "sendmail $email < $create";
   system "rm -rf $create"; 
 }
 
 #PROCESSING
-#FILEPARSE NAME
+#FILEPARSE NAME 
 my $outgatk = fileparse($REF, qr/\.[^.]*(\.gz)?$/);
 SORTGATK();
-
 if ($CONFIGURE{"TYPEOFINPUT"} =~ /^BAM$/i) {
   if ($notify) { NOTIFICATION("Processing Variants from Bam File");  }
+  $bamfile = $CONFIGURE{"FILENAME"};
   VARIANTS();
-  $bamfile = $CONFIGURE{"FILENAME"}; 
 }
 elsif ($CONFIGURE{"TYPEOFINPUT"} =~ /^FASTQ$/i) {
   if ($notify) { NOTIFICATION("Genome Assembly using TOPHAT");  }
@@ -202,9 +200,9 @@ sub ASSEMBLY {
   #building index
   #`$BOWTIE2-build $REF $outputfolder/$outgatk`;
   if ($ANN){
-  #  `$TOPHAT --library-type fr-unstranded --no-coverage-search -G $ANN -p 24 -o $outputfolder $outputfolder/$outgatk $CONFIGURE{"FILENAME"}`;
+    `$TOPHAT --library-type fr-unstranded --no-coverage-search -G $ANN -p 24 -o $outputfolder $outputfolder/$outgatk $CONFIGURE{"FILENAME"}`;
   }else {
-  #  `$TOPHAT --library-type fr-unstranded --no-coverage-search -p 24 -o $outputfolder $outputfolder/$outgatk $CONFIGURE{"FILENAME"}`;
+    `$TOPHAT --library-type fr-unstranded --no-coverage-search -p 24 -o $outputfolder $outputfolder/$outgatk $CONFIGURE{"FILENAME"}`;
   }
   VARIANTS();
 }
@@ -213,11 +211,11 @@ sub VARIANTS{
   my $DICT = $outputfolder."/".fileparse($REF, qr/(\..*)?$/).".dict";
 
   #CREATE DICTIONARY for gatk
-  `java -jar $PICARDDIR CreateSequenceDictionary R=$REF O=$DICT`;
+  my $java = "java -jar $PICARDDIR CreateSequenceDictionary R=$REF O=$DICT"; `$java`;
   if ($notify) { NOTIFICATION("Sequence Dictionary complete");  }
   
   #QUALITY SCORE DISTRIBUTION
-  `java -jar $PICARDDIR QualityScoreDistribution INPUT=$bamfile OUTPUT=$outputfolder/qualityscores.txt CHART=$outputfolder/qualityscores.chart`;
+  $java = "java -jar $PICARDDIR QualityScoreDistribution INPUT=$bamfile OUTPUT=$outputfolder/qualityscores.txt CHART=$outputfolder/qualityscores.chart"; print $java;
   #CHECK QUALITY SCORE DISTRIBUTION
   open(CHECK,"<$outputfolder/qualityscores.txt");
   while (<CHECK>) { if (((split("\t",$_, 2))[0]) > 59){ $flag = "--fix_misencoded_quality_scores"; } }
