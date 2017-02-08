@@ -1,81 +1,4 @@
 #!/usr/bin/perl
-
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-# - - - - - - - - - - - - - - - - - H E A D E R - - - - - - - - - - - - - - - - - - -
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-# MANUAL FOR VariantdetectionAnalysis.pl
-
-=pod
-
-=head1 NAME
-
-$0 -- Comprehensive pipeline : Variant detection using PICARD, GATK and produces and output folder.
-
-=head1 SYNOPSIS
-
-VariantdetectionAnalysis.pl -a configfile [--help] [--manual]
-
-=head1 DESCRIPTION
-
-Accepts all folders from frnakenstein output.
- 
-=head1 OPTIONS
-
-=over 3
-
-=item B<-a, -c, --config>=FILE
-
-Configuration file (a template can be found @ .. ).  (Required)
-
-=item B<-h, --help>
-
-Displays the usage message.  (Optional) 
-
-=item B<-man, --manual>
-
-Displays full manual.  (Optional) 
-
-=back
-
-=head1 DEPENDENCIES
-
-Requires the following Perl libraries (all standard in most Perl installs).
-   Getopt::Long
-   Pod::Usage
-use strict;
-use File::Basename;
-use Getopt::Long;
-use Time::localtime;
-use Pod::Usage;
-use Time::Piece;
-use File::stat;
-use DateTime;
-use IO::Uncompress::Gunzip qw(gunzip $GunzipError);
-
-=head1 AUTHOR
-
-Written by Modupe Adetunji, 
-Center for Bioinformatics and Computational Biology Core Facility, University of Delaware.
-
-=head1 REPORTING BUGS
-
-Report bugs to amodupe@udel.edu
-
-=head1 COPYRIGHT
-
-Copyright 2015 MOA.  
-License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.  
-This is free software: you are free to change and redistribute it.  
-There is NO WARRANTY, to the extent permitted by law.  
-
-Please acknowledge author and affiliation in published work arising from this script's usage
-=cut
-
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-# - - - - - - - - - - - - - - U S E R  V A R I A B L E S- - - - - - - - - - - - - - -
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
 # CODE FOR 
 use strict;
 use File::Basename;
@@ -87,7 +10,14 @@ use File::stat;
 use DateTime;
 use IO::Uncompress::Gunzip qw(gunzip $GunzipError);
 
- 
+our ($TOPHAT, $BOWTIE2, $PICARDDIR, $GATKDIR, $VEP, $SNPdat, $SNPEFF, $ANNOVAR, $REF, $ANN, $outputfolder, $specie, $variantsname);
+my ($email, $notify); #notification options
+
+
+my $date = `date +%m-%d-%y_%T`; chomp $date;
+my $std_out = "VAP-$date.log";
+my $std_err = "VAP-$date.err";
+
 #ARGUMENTS
 my($help,$manual,$config,%CONFIGURE, $bamfile, $flag);
 GetOptions (
@@ -99,43 +29,19 @@ GetOptions (
 pod2usage( -verbose => 2 )  if ($manual);
 pod2usage( -verbose => 1 )  if ($help);
 pod2usage( -msg  => "ERROR!  Required argument(s) are not found.\n", -exitval => 2, -verbose => 1)  if (! $config);
-#file path for configuration file
-open(CONFIG, "<", $config) or die "Configuration File \"$config\" can't be found\nTERMINATED!\n";
-while (<CONFIG>){
-  chomp;
-  if ($_ =~ /\=/){
-    my @ALL = split"\="; $ALL[1] =~ s/\[.+\]//g; #removing comments 
-    foreach my $i (0..$#ALL) {$ALL[$i] =~ s/^\s+|\s+$//g;} #removing whitespace
-    $CONFIGURE{$ALL[0]} = $ALL[1];
-  }
-}close CONFIG;
-#INDEPENDENT PROGRAMS TO RUN
-my $TOPHAT=$CONFIGURE{"TOPHAT"};
-my $BOWTIE2=$CONFIGURE{"BOWTIE2"};
-my $PICARDDIR=$CONFIGURE{"PICARDDIR"}."/picard.jar";
-my $GATKDIR=$CONFIGURE{"GATKDIR"}."/GenomeAnalysisTK.jar";
-my $VEP=$CONFIGURE{"VEP"} . "/scripts/variant_effect_predictor/variant_effect_predictor.pl";
-my $SNPdat=$CONFIGURE{"SNPDAT"};
-my $SNPEFF=$CONFIGURE{"SNPEFF"};
-my $REF = $CONFIGURE{"REFERENCE"};
-my $ANN = $CONFIGURE{"ANN"};
-my $outputfolder = $CONFIGURE{"FOLDER"};
-my $specie = $CONFIGURE{"ORGANISM"};
-my $variantsname = "$outputfolder/all_variants.vcf";
-my ($email, $notify); #notification options
-#CLEAN UP OPTIONS
-unless ($CONFIGURE{"TYPEOFDATA"} =~ /^(DNA|RNA)$/i) {
-  die "TYPEOFDATA can only be DNA/RNA\t Sorry!\n";
-}
-unless ($CONFIGURE{"TYPEOFINPUT"} =~ /^(BAM|FASTQ)$/i) {
-  die "TYPEOFINPUT can only be = BAM/FASTQ\t Sorry!\n";
-}
+@ARGV == 0 || pod2usage("ERROR! Additional comments '@ARGV' not required\n");
 
+configureinput(); #configure input options
+#stdout and stderr
+`mkdir -p $outputfolder`;
+open(STDOUT, '>', "$outputfolder/$std_out") or die "Log file doesn't exist";
+open(STDERR, '>', "$outputfolder/$std_err") or die "Error file doesn't exist";
+ 
 #CREATE OUTPUT DIRECTORY
-`mkdir $outputfolder`;
+my @foldercontent = split("\n", `find $outputfolder`); #get details of the folder
 
 #EMAILS
-my $subject = 'VAP-'.`date +%m-%d-%y_%T`; chomp $subject; my $notification = $outputfolder."/".$subject.'.log';
+my $subject = "VAP-$date"; my $notification = $outputfolder."/".$subject.'.log';
 if (length($CONFIGURE{"SUBJECT"}) >= 1) { $subject = $CONFIGURE{"SUBJECT"}; }
 if (length ($CONFIGURE{"EMAIL"}) >= 1) {
   $email = $CONFIGURE{"EMAIL"};
@@ -152,13 +58,23 @@ Currently you are running the VAP with the following options:
     6. Filtering : $CONFIGURE{"FILTER"}
 ENDWELCOME
   if ($CONFIGURE{"FILTER"} =~ /YES/i){
-    $welcome .= "    7. Filtering options\n\t\tDP : $CONFIGURE{'DP'}\n";
+    $welcome .= "    7. Filtering options\n";
+    if ($CONFIGURE{"SEPARATEVARIANTS"} =~ /YES/i) {
+      $welcome .= " \t#SNP\n\t\tDP : $CONFIGURE{'SNP-DP'}\n";
+      $welcome .= "\t\tQD : $CONFIGURE{'SNP-QD'}\n\t\tMQ : $CONFIGURE{'SNP-MQ'}\n\t\tMQRankSum : $CONFIGURE{'SNP-MQRankSum'}\n\t\tFS : $CONFIGURE{'SNP-FS'}\n\t\tReadPosRankSum : $CONFIGURE{'SNP-ReadPosRankSum'}\n";
+      $welcome .= " \t#INDEL\n\t\tDP : $CONFIGURE{'INDEL-DP'}\n";
+      $welcome .= "\t\tQD : $CONFIGURE{'INDEL-QD'}\n\t\tFS : $CONFIGURE{'INDEL-FS'}\n\t\tReadPosRankSum : $CONFIGURE{'INDEL-ReadPosRankSum'}\n";
+    } else {
+      $welcome .= " \t\tDP : $CONFIGURE{'SNP-DP'}\n";
+      $welcome .= "\t\tQD : $CONFIGURE{'SNP-QD'}\n\t\tMQ : $CONFIGURE{'SNP-MQ'}\n\t\tMQRankSum : $CONFIGURE{'SNP-MQRankSum'}\n\t\tFS : $CONFIGURE{'SNP-FS'}\n\t\tReadPosRankSum : $CONFIGURE{'SNP-ReadPosRankSum'}\n";
+    }
   }
   my $create = ".welcome";
   open (WELCOME, ">$create");
   print WELCOME "$welcome\n";
   close WELCOME;
   system "mail -s \"VAP - $subject\" $email < $create";
+  `mv $create $outputfolder/welcome-$date.log`;
   system "rm -rf $create"; 
 }
 
@@ -194,6 +110,48 @@ elsif ($CONFIGURE{"TOOL"} =~ /snpeff/i) {
 
 
 ##SUBROUTINES
+sub configureinput {
+  my ($prefix, $check);
+  open(CONFIG, "<", $config) or die "Configuration File \"$config\" can't be found\nTERMINATED!\n";
+  while (<CONFIG>){
+    chomp;
+    if (($_ =~ /\#(SNP)/) || ($_ =~ /\#(INDEL)/)){
+      $prefix = $1;
+      $check = 1;
+    }  elsif ($_ =~ /^\#/) { $check = 2;}; #undo prefix addendum
+    if ($_ =~ /\=/){
+      my @ALL = split"\="; $ALL[1] =~ s/\[.+\]//g; #removing comments 
+      foreach my $i (0..$#ALL) {$ALL[$i] =~ s/^\s+|\s+$//g;} #removing whitespace
+      if ($check == 1) {
+        my $newcheck = "$prefix-$ALL[0]";
+        $CONFIGURE{$newcheck} = $ALL[1];
+      } else {
+        $CONFIGURE{$ALL[0]} = $ALL[1];
+      }
+    }
+  } close CONFIG;
+  #INDEPENDENT PROGRAMS TO RUN
+  $TOPHAT=$CONFIGURE{"TOPHAT"};
+  $BOWTIE2=$CONFIGURE{"BOWTIE2"};
+  $PICARDDIR=$CONFIGURE{"PICARDDIR"}."/picard.jar";
+  $GATKDIR=$CONFIGURE{"GATKDIR"}."/GenomeAnalysisTK.jar";
+  $VEP=$CONFIGURE{"VEP"} . "/scripts/variant_effect_predictor/variant_effect_predictor.pl";
+  $SNPdat=$CONFIGURE{"SNPDAT"};
+  $SNPEFF=$CONFIGURE{"SNPEFF"};
+  $REF = $CONFIGURE{"REFERENCE"};
+  $ANN = $CONFIGURE{"ANN"};
+  $outputfolder = $CONFIGURE{"FOLDER"};
+  $specie = $CONFIGURE{"ORGANISM"};
+  $variantsname = "$outputfolder/all_variants.vcf";
+  #CLEAN UP OPTIONS
+  unless ($CONFIGURE{"TYPEOFDATA"} =~ /^(DNA|RNA)$/i) {
+    die "TYPEOFDATA can only be DNA/RNA\t Sorry!\n";
+  }
+  unless ($CONFIGURE{"TYPEOFINPUT"} =~ /^(BAM|FASTQ)$/i) {
+    die "TYPEOFINPUT can only be = BAM/FASTQ\t Sorry!\n";
+  }
+}
+
 sub ASSEMBLY {
   #TOPHAT assembly
   if ($notify) { NOTIFICATION("Assembly of the genome");  }
@@ -215,50 +173,156 @@ sub VARIANTS{
   if ($notify) { NOTIFICATION("Sequence Dictionary complete");  }
   
   #QUALITY SCORE DISTRIBUTION
-  $java = "java -jar $PICARDDIR QualityScoreDistribution INPUT=$bamfile OUTPUT=$outputfolder/qualityscores.txt CHART=$outputfolder/qualityscores.chart"; print $java;
+  $java = "java -jar $PICARDDIR QualityScoreDistribution INPUT=$bamfile OUTPUT=$outputfolder/qualityscores.txt CHART=$outputfolder/qualityscores.chart";
+  `$java`;
+  
   #CHECK QUALITY SCORE DISTRIBUTION
   open(CHECK,"<$outputfolder/qualityscores.txt");
   while (<CHECK>) { if (((split("\t",$_, 2))[0]) > 59){ $flag = "--fix_misencoded_quality_scores"; } }
   close CHECK;
   
   #SORT BAM
-  if ($specie =~ /human/i || $specie =~ /homo/i){ #human samples can be reordered.
-    `java -jar $PICARDDIR ReorderSam INPUT=$bamfile OUTPUT=$outputfolder/aln_sorted.bam REFERENCE=$REF`;
+  my $doesexist = (grep /aln_sorted.bam/, @foldercontent)[0];
+  unless ($doesexist) {
+    if ($specie =~ /human/i || $specie =~ /homo/i){ #human samples can be reordered.
+      `java -jar $PICARDDIR ReorderSam INPUT=$bamfile OUTPUT=$outputfolder/aln_sorted.bam REFERENCE=$REF`;
+    } else {
+      `java -jar $PICARDDIR SortSam INPUT=$bamfile OUTPUT=$outputfolder/aln_sorted.bam SO=coordinate`;
+    }
+    if ($notify) { NOTIFICATION("Sort Bam complete");  }
   } else {
-    `java -jar $PICARDDIR SortSam INPUT=$bamfile OUTPUT=$outputfolder/aln_sorted.bam SO=coordinate`;
+    if ($notify) { NOTIFICATION("Sort Bam previously completed"); }
+    print "\nVAPSTATUS:\tSort Bam previously completed\n"
   }
-  if ($notify) { NOTIFICATION("Sort Bam complete");  }      
+  
   #ADDREADGROUPS
-  my $addreadgroup = "java -jar $PICARDDIR AddOrReplaceReadGroups INPUT=$outputfolder/aln_sorted.bam OUTPUT=$outputfolder/aln_sorted_add.bam SO=coordinate RGID=Label RGLB=Label RGPL=illumina RGPU=Label RGSM=Label";
-  `$addreadgroup`;
-  if ($notify) { NOTIFICATION("Add read groups complete");  }
-  
-  #MARKDUPLICATES
-  my $markduplicates = "java -jar $PICARDDIR MarkDuplicates INPUT=$outputfolder/aln_sorted_add.bam OUTPUT=$outputfolder/aln_sorted_mdup.bam M=$outputfolder/aln_sorted_mdup.metrics CREATE_INDEX=true";
-  `$markduplicates`;
-  if ($notify) { NOTIFICATION("Mark duplicates complete");  }
-  
+  $doesexist = (grep /aln_sorted_add.bam/, @foldercontent)[0];
+  unless ($doesexist) {
+    my $addreadgroup = "java -jar $PICARDDIR AddOrReplaceReadGroups INPUT=$outputfolder/aln_sorted.bam OUTPUT=$outputfolder/aln_sorted_add.bam SO=coordinate RGID=Label RGLB=Label RGPL=illumina RGPU=Label RGSM=Label";
+    `$addreadgroup`;
+    if ($notify) { NOTIFICATION("Add read groups complete");  }
+  } else {
+    if ($notify) { NOTIFICATION("Add read groups previously completed");  }
+    print "\nVAPSTATUS:\tAdd read groups previously completed\n";
+  }
+  #specified into RNAseq or DNAseq
   if ($CONFIGURE{"TYPEOFDATA"} =~ /^RNA$/i) {
+    #MARKDUPLICATES
+    $doesexist = (grep /aln_sorted_mdup.bam/, @foldercontent)[0];
+    unless ($doesexist) {
+      my $markduplicates = "java -jar $PICARDDIR MarkDuplicates INPUT=$outputfolder/aln_sorted_add.bam OUTPUT=$outputfolder/aln_sorted_mdup.bam M=$outputfolder/aln_sorted_mdup.metrics CREATE_INDEX=true";
+      `$markduplicates`;
+      if ($notify) { NOTIFICATION("Mark duplicates complete");  }
+    } else {
+      if ($notify) { NOTIFICATION("Mark duplicates previously completed");  }
+      print "\nVAPSTATUS:\tMark duplicates previously completed\n";
+    }
+    
     #SPLIT&TRIM
-    my $splittrim = "java -jar $GATKDIR -T SplitNCigarReads $flag -R $REF -I $outputfolder/aln_sorted_mdup.bam -o $outputfolder/aln_sorted_split.bam -rf ReassignOneMappingQuality -RMQF 255 -RMQT 60 --filter_reads_with_N_cigar";
-    `$splittrim`;
-    if ($notify) { NOTIFICATION("SplitNCigars complete");  }
+    $doesexist = (grep /aln_sorted_split.bam/, @foldercontent)[0];
+    unless ($doesexist) {
+      my $splittrim = "java -jar $GATKDIR -T SplitNCigarReads $flag -R $REF -I $outputfolder/aln_sorted_mdup.bam -o $outputfolder/aln_sorted_split.bam -rf ReassignOneMappingQuality -RMQF 255 -RMQT 60 --filter_reads_with_N_cigar";
+      `$splittrim`;
+      if ($notify) { NOTIFICATION("SplitNCigars complete");  }
+    } else {
+      if ($notify) { NOTIFICATION("SplitNCigars previously completed");  }
+      print "\nVAPSTATUS:\tSplitNCigars previously completed\n";
+    }
     
     #GATK
-    my $gatk = "java -jar $GATKDIR -T HaplotypeCaller -R $REF -I $outputfolder/aln_sorted_split.bam -o $variantsname";
-    `$gatk`;
-    if ($notify) { NOTIFICATION("Haplotype caller complete");  }
+    $doesexist = (grep /all_variants.vcf/, @foldercontent)[0];
+    unless ($doesexist) {
+      my $gatk = "java -jar $GATKDIR -T HaplotypeCaller -R $REF -I $outputfolder/aln_sorted_split.bam -o $variantsname";
+      `$gatk`;
+      if ($notify) { NOTIFICATION("Haplotype caller complete");  }
+    } else {
+      if ($notify) { NOTIFICATION("Haplotype caller previously completed");  }
+      print "\nVAPSTATUS:\tHaplotype caller previously completed\n";
+    }
   }
   else {
-    my $gatk = "java -jar $GATKDIR -T HaplotypeCaller -R $REF -I $outputfolder/aln_sorted_mdup.bam -o $variantsname";
-    `$gatk`;
+    #working with DNA
+    #MARKDUPLICATES
+    $doesexist = (grep /aln_sorted_mdup.bam/, @foldercontent)[0];
+    unless ($doesexist) {
+      `java -jar $PICARDDIR MarkDuplicates INPUT=$outputfolder/aln_sorted_add.bam OUTPUT=$outputfolder/aln_sorted_mdup.bam M=$outputfolder/aln_sorted_mdup.metrics CREATE_INDEX=true`;
+      if ($notify) { NOTIFICATION("Mark duplicates complete");  }
+    } else {
+      if ($notify) { NOTIFICATION("Mark duplicates previously completed");  }
+      print "\nVAPSTATUS:\tMark duplicates previously completed\n";
+    }
+    
+    #GATK
+    $doesexist = (grep /all_variants.vcf/, @foldercontent)[0];
+    unless ($doesexist) {
+    `java -jar $GATKDIR -T HaplotypeCaller -R $REF -I $outputfolder/aln_sorted_mdup.bam -o $outputfolder/all_variants.vcf`;
+    `java -jar $GATKDIR -T HaplotypeCaller -R $REF -I $outputfolder/aln_sorted_mdup.bam --emitRefConfidence GVCF -o $outputfolder/all_variants_emit.vcf`;
+    `java -jar $GATKDIR -T HaplotypeCaller -R $REF -I $outputfolder/aln_sorted_mdup.bam --genotyping_mode DISCOVERY -stand_emit_conf 10 -stand_call_conf 30 -o $outputfolder/all_variants_genotype.vcf`;
+    `java -jar $GATKDIR -T HaplotypeCaller -R $REF -I $outputfolder/aln_sorted_mdup.bam --genotyping_mode DISCOVERY -stand_emit_conf 10 -stand_call_conf 30 --emitRefConfidence GVCF -o $outputfolder/all_variants_genotypeemit.vcf`;
     if ($notify) { NOTIFICATION("Haplotype caller complete");  }
+    } else {
+      if ($notify) { NOTIFICATION("Haplotype caller previously completed");  }
+      print "\nVAPSTATUS:\tHaplotype caller previously completed\n";
+    }
   }
-  #perl to select DP > 5 & get header information
+  
+  #filter based on criteria
   if ($CONFIGURE{"FILTER"} =~ /YES/){
-    FILTERING($outputfolder, "$outputfolder/$variantsname");
-    if ($notify) { NOTIFICATION("Fitering complete");  }
-    $variantsname = "$outputfolder/all_filtered.vcf";
+    my $filteryes = 0;
+    my (@snpfilteryes, @indelfilteryes);
+    my $snpfilterexpression = " --filterExpression \"";
+    my $indelfilterexpression = " --filterExpression \"";
+    #separate SNPS and INDELS
+    if ($CONFIGURE{"SEPARATEVARIANTS"} =~ /YES/i) {
+      `java -jar $GATKDIR -T SelectVariants -R $REF -V $outputfolder/all_variants.vcf -selectType SNP -o $outputfolder/raw_snps.vcf`;
+      `java -jar $GATKDIR -T SelectVariants -R $REF -V $outputfolder/all_variants.vcf -selectType INDEL -o $outputfolder/raw_indels.vcf`;
+      #filter based on defaults or specified criteria
+      my $snpfilter = "java -jar $GATKDIR -T VariantFiltration -R $REF -V $outputfolder/raw_snps.vcf --filterName \"FAILED\" -o $outputfolder/filtered_snps.vcf";
+      my $indelfilter = "java -jar $GATKDIR -T VariantFiltration -R $REF -V $outputfolder/raw_indels.vcf --filterName \"FAILED\" -o $outputfolder/filtered_indels.vcf";
+      if ($CONFIGURE{"SNP-DP"} =~ /\d/){ $filteryes = 1;  push @snpfilteryes, "DP < $CONFIGURE{'SNP-DP'}"; }
+      if ($CONFIGURE{"INDEL-DP"} =~ /\d/){ $filteryes = 1; push @indelfilteryes, "DP < $CONFIGURE{'INDEL-DP'}"; }
+      if ($CONFIGURE{"SNP-QD"} =~ /\d/){ $filteryes = 1; push @snpfilteryes, "QD < $CONFIGURE{'SNP-QD'}"; }
+      if ($CONFIGURE{"INDEL-QD"} =~ /\d/){ $filteryes = 1; push @indelfilteryes, "QD < $CONFIGURE{'INDEL-QD'}"; }
+      if ($CONFIGURE{"SNP-MQ"} =~ /\d/){ $filteryes = 1; push @snpfilteryes, "MQ < $CONFIGURE{'SNP-MQ'}"; }
+      if ($CONFIGURE{"SNP-MQRankSum"} =~ /\d/){ $filteryes = 1; push @snpfilteryes, "MQRankSum < $CONFIGURE{'SNP-MQRankSum'}"; }
+      if ($CONFIGURE{"SNP-FS"} =~ /\d/){ $filteryes = 1; push @snpfilteryes, "FS < $CONFIGURE{'SNP-FS'}"; }
+      if ($CONFIGURE{"INDEL-FS"} =~ /\d/){ $filteryes = 1; push @indelfilteryes, "FS < $CONFIGURE{'INDEL-FS'}"; }
+      if ($CONFIGURE{"SNP-ReadPosRankSum"} =~ /\d/){ $filteryes = 1; push @snpfilteryes, "ReadPosRankSum < $CONFIGURE{'SNP-ReadPosRankSum'}"; }
+      if ($CONFIGURE{"INDEL-ReadPosRankSum"} =~ /\d/){ $filteryes = 1; push @indelfilteryes, "ReadPosRankSum < $CONFIGURE{'INDEL-ReadPosRankSum'}"; }
+      if ($filteryes == 1){ foreach ( @snpfilteryes ){ $snpfilterexpression .=  $_.' || ';} } $snpfilterexpression = substr($snpfilterexpression,0,-4); $snpfilterexpression .= "\""; $snpfilter .= $snpfilterexpression;
+      if ($filteryes == 1){ foreach ( @indelfilteryes ){ $indelfilterexpression .=  $_.' || ';} } $indelfilterexpression = substr($indelfilterexpression,0,-4); $indelfilterexpression .= "\""; $indelfilter .= $indelfilterexpression;
+      `$snpfilter`;
+      `$indelfilter`;
+      if ($notify) { NOTIFICATION("Filtering complete");  }
+      FILTERING($outputfolder, "$outputfolder/filtered_snps.vcf"); #separating failed variants
+      FILTERING($outputfolder, "$outputfolder/filtered_indels.vcf");
+      if ($notify) { NOTIFICATION("Separating failed variants complete");  }
+      #  `java -jar $GATKDIR -T VariantFiltration -R $REF -V $outputfolder/raw_snps.vcf \
+      #    --filterExpression \"QD < $CONFIGURE{"QD"} || MQ < $CONFIGURE{"MQ"} || DP < $CONFIGURE{"DP"}  || MQRankSum < $CONFIGURE{"MQRankSum"} || FS > $CONFIGURE{"FS"} || ReadPosRankSum < $CONFIGURE{"ReadPosRankSum"}\" \
+      #    --filterName "FAILED" \
+      #    -o $outputfolder/filtered_snps.vcf`;
+      #`java -jar $GATKDIR -T VariantFiltration -R $REF -V $outputfolder/raw_indels.vcf \
+      #    --filterExpression \"QD < $CONFIGURE{"QD"} || DP < $CONFIGURE{"DP"} || FS >$CONFIGURE{"FS"} || ReadPosRankSum < $CONFIGURE{"ReadPosRankSum"}\" \
+      #    --filterName "FAILED" \
+      #    -o $outputfolder/filtered_indels.vcf`;
+    } else {
+      my $filter = "java -jar $GATKDIR -T VariantFiltration -R $REF -V $outputfolder/all_variants.vcf --filterName \"FAILED\" -o $outputfolder/all_filtered.vcf";
+      if ($CONFIGURE{"SNP-DP"} =~ /\d/){ $filteryes = 1;  push @snpfilteryes, "DP < $CONFIGURE{'SNP-DP'}"; }
+      if ($CONFIGURE{"SNP-QD"} =~ /\d/){ $filteryes = 1; push @snpfilteryes, "QD < $CONFIGURE{'SNP-QD'}"; }
+      if ($CONFIGURE{"SNP-MQ"} =~ /\d/){ $filteryes = 1; push @snpfilteryes, "MQ < $CONFIGURE{'SNP-MQ'}"; }
+      if ($CONFIGURE{"SNP-MQRankSum"} =~ /\d/){ $filteryes = 1; push @snpfilteryes, "MQRankSum < $CONFIGURE{'SNP-MQRankSum'}"; }
+      if ($CONFIGURE{"SNP-FS"} =~ /\d/){ $filteryes = 1; push @snpfilteryes, "FS < $CONFIGURE{'SNP-FS'}"; }
+      if ($CONFIGURE{"SNP-ReadPosRankSum"} =~ /\d/){ $filteryes = 1; push @snpfilteryes, "ReadPosRankSum < $CONFIGURE{'SNP-ReadPosRankSum'}"; }
+      if ($filteryes == 1){ foreach ( @snpfilteryes ){ $snpfilterexpression .=  $_.' || ';} } $snpfilterexpression = substr($snpfilterexpression,0,-4); $snpfilterexpression .= "\""; $filter .= $snpfilterexpression;
+      `$filter`;
+      if ($notify) { NOTIFICATION("Filtering complete");  }
+      FILTERING($outputfolder, "$outputfolder/all_filtered.vcf");
+      if ($notify) { NOTIFICATION("Separating failed variants complete");  }
+    }
+    
+    #FILTERING($outputfolder, "$outputfolder/$variantsname");
+    #if ($notify) { NOTIFICATION("Separating failed variants complete");  }
+    #$variantsname = "$outputfolder/all_filtered.vcf";
   }
   system "rm -rf $notification";
 #  ANNOTATION($CONFIGURE{"TOOL"});
@@ -266,28 +330,26 @@ sub VARIANTS{
 }
 
 sub FILTERING {
-  my $input = $_[1];
-  my $wkdir = $_[0];
-  unless(open(FILE,$input)){
-    print "File \'$input\' doesn't exist\n";
-    exit;
-  }
-  my $out = fileparse($input, qr/(\.vcf)?$/);
-  my $output = "all_filtered.vcf";
-  open(OUT,">$wkdir/$output");
+  open(FILE,$_[1]) or die "File \'$_[1]\' doesn't exist\n";
+  #my $out = fileparse($_[1], qr/(\.vcf)?$/);
+  my $output = $_[0]."/".fileparse($_[1], qr/(\..*)?$/)."_passed.vcf";
+  open(OUT,">$_[0]/$output");
 
   my @file = <FILE>; chomp @file; close (FILE);
   foreach my $chr (@file){
     unless ($chr =~ /^\#/){
       my @chrdetails = split('\t', $chr);
-      my $chrIwant = $chrdetails[7];
-      my @morechrsplit = split(';', $chrIwant);
-      foreach my $Imptchr (@morechrsplit){
-        if ($Imptchr =~ m/^DP/) {
-          my @addchrsplit = split('=', $Imptchr);
-          if ($addchrsplit[1] > $CONFIGURE{"DP"}){print OUT "$chr\n";}
-        }
+      my $chrIwant = $chrdetails[6];
+      if ($chrIwant =~ /PASS/) {
+        print OUT $chr, "\n";
       }
+      #my @morechrsplit = split(';', $chrIwant);
+      #foreach my $Imptchr (@morechrsplit){
+      #  if ($Imptchr =~ m/^DP/) {
+       #   my @addchrsplit = split('=', $Imptchr);
+        #  if ($addchrsplit[1] > $CONFIGURE{"DP"}){print OUT "$chr\n";}
+        #}
+      #}
     }
     else {
       print OUT "$chr\n";
@@ -318,6 +380,7 @@ sub NOTIFICATION {
   print NOTE "\nStatus is : $_[0]";
   close NOTE;
   system "mail -s \"$subject\" $email < $notification";
+  `cat $notification >> $outputfolder/welcome-$date.log`;
 }
 
 sub SORTGATK {
@@ -423,3 +486,81 @@ sub SORTGATK {
   $/ = "\n";
   $REF = "$outputfolder/$outgatk.fa";
 }
+
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# - - - - - - - - - - - - - - - - - H E A D E R - - - - - - - - - - - - - - - - - - -
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+# MANUAL FOR VariantdetectionAnalysis.pl
+
+=pod
+
+=head1 NAME
+
+$0 -- Comprehensive pipeline : Variant detection using PICARD, GATK and produces and output folder.
+
+=head1 SYNOPSIS
+
+VariantdetectionAnalysis.pl -a configfile [--help] [--manual]
+
+=head1 DESCRIPTION
+
+Accepts all folders from frnakenstein output.
+ 
+=head1 OPTIONS
+
+=over 3
+
+=item B<-a, -c, --config>=FILE
+
+Configuration file (a template can be found @ .. ).  (Required)
+
+=item B<-h, --help>
+
+Displays the usage message.  (Optional) 
+
+=item B<-man, --manual>
+
+Displays full manual.  (Optional) 
+
+=back
+
+=head1 DEPENDENCIES
+
+Requires the following Perl libraries (all standard in most Perl installs).
+   Getopt::Long
+   Pod::Usage
+use strict;
+use File::Basename;
+use Getopt::Long;
+use Time::localtime;
+use Pod::Usage;
+use Time::Piece;
+use File::stat;
+use DateTime;
+use IO::Uncompress::Gunzip qw(gunzip $GunzipError);
+
+=head1 AUTHOR
+
+Written by Modupe Adetunji, 
+Center for Bioinformatics and Computational Biology Core Facility, University of Delaware.
+
+=head1 REPORTING BUGS
+
+Report bugs to amodupe@udel.edu
+
+=head1 COPYRIGHT
+
+Copyright 2015 MOA.  
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.  
+This is free software: you are free to change and redistribute it.  
+There is NO WARRANTY, to the extent permitted by law.  
+
+Please acknowledge author and affiliation in published work arising from this script's usage
+=cut
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# - - - - - - - - - - - - - - U S E R  V A R I A B L E S- - - - - - - - - - - - - - -
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
