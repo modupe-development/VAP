@@ -138,6 +138,7 @@ sub configureinput {
   $VEP=$CONFIGURE{"VEP"} . "/scripts/variant_effect_predictor/variant_effect_predictor.pl";
   $SNPdat=$CONFIGURE{"SNPDAT"};
   $SNPEFF=$CONFIGURE{"SNPEFF"};
+  $ANNOVAR = $CONFIGURE{"ANNOVAR"} . "/table_annovar.pl";
   $REF = $CONFIGURE{"REFERENCE"};
   $ANN = $CONFIGURE{"ANN"};
   $outputfolder = $CONFIGURE{"FOLDER"};
@@ -169,12 +170,19 @@ sub VARIANTS{
   my $DICT = $outputfolder."/".fileparse($REF, qr/(\..*)?$/).".dict";
 
   #CREATE DICTIONARY for gatk
-  my $java = "java -jar $PICARDDIR CreateSequenceDictionary R=$REF O=$DICT"; `$java`;
-  if ($notify) { NOTIFICATION("Sequence Dictionary complete");  }
-  
+  my $doesexist = (grep /\.dict/, @foldercontent)[0];
+  unless ($doesexist) {
+    `java -jar $PICARDDIR CreateSequenceDictionary R=$REF O=$DICT`;
+    if ($notify) { NOTIFICATION("Sequence Dictionary complete");  }
+  } else {
+    if ($notify) { NOTIFICATION("Sequence Dictionary previously completed");  }
+    print "\nVAPSTATUS:\tSequence Dictionary previously completed\n";
+  }
   #QUALITY SCORE DISTRIBUTION
-  $java = "java -jar $PICARDDIR QualityScoreDistribution INPUT=$bamfile OUTPUT=$outputfolder/qualityscores.txt CHART=$outputfolder/qualityscores.chart";
-  `$java`;
+  $doesexist = (grep /qualityscores.txt/, @foldercontent)[0];
+  unless ($doesexist) {
+    `java -jar $PICARDDIR QualityScoreDistribution INPUT=$bamfile OUTPUT=$outputfolder/qualityscores.txt CHART=$outputfolder/qualityscores.chart`;
+  }
   
   #CHECK QUALITY SCORE DISTRIBUTION
   open(CHECK,"<$outputfolder/qualityscores.txt");
@@ -182,13 +190,10 @@ sub VARIANTS{
   close CHECK;
   
   #SORT BAM
-  my $doesexist = (grep /aln_sorted.bam/, @foldercontent)[0];
+  $doesexist = (grep /aln_sorted.bam/, @foldercontent)[0];
   unless ($doesexist) {
-    if ($specie =~ /human/i || $specie =~ /homo/i){ #human samples can be reordered.
-      `java -jar $PICARDDIR ReorderSam INPUT=$bamfile OUTPUT=$outputfolder/aln_sorted.bam REFERENCE=$REF`;
-    } else {
-      `java -jar $PICARDDIR SortSam INPUT=$bamfile OUTPUT=$outputfolder/aln_sorted.bam SO=coordinate`;
-    }
+   `java -jar $PICARDDIR SortSam INPUT=$bamfile OUTPUT=$outputfolder/aln_sorted.bam SO=coordinate`;
+  #`java -jar $PICARDDIR ReorderSam INPUT=$bamfile OUTPUT=$outputfolder/aln_sorted.bam REFERENCE=$REF`;
     if ($notify) { NOTIFICATION("Sort Bam complete");  }
   } else {
     if ($notify) { NOTIFICATION("Sort Bam previously completed"); }
@@ -205,19 +210,29 @@ sub VARIANTS{
     if ($notify) { NOTIFICATION("Add read groups previously completed");  }
     print "\nVAPSTATUS:\tAdd read groups previously completed\n";
   }
+  
+  #MARKDUPLICATES
+  $doesexist = (grep /aln_sorted_mdup.bam/, @foldercontent)[0];
+  unless ($doesexist) {
+    my $markduplicates = "java -jar $PICARDDIR MarkDuplicates INPUT=$outputfolder/aln_sorted_add.bam OUTPUT=$outputfolder/aln_sorted_mdup.bam M=$outputfolder/aln_sorted_mdup.metrics CREATE_INDEX=true";
+    `$markduplicates`;
+    if ($notify) { NOTIFICATION("Mark duplicates complete");  }
+  } else {
+    if ($notify) { NOTIFICATION("Mark duplicates previously completed");  }
+    print "\nVAPSTATUS:\tMark duplicates previously completed\n";
+  }
+  
+  #REORDER SAM
+  $doesexist = (grep /aln_resorted_mdup.bam/, @foldercontent)[0];
+  unless ($doesexist) {
+    `java -jar $PICARDDIR ReorderSam INPUT=$outputfolder/aln_sorted_mdup.bam OUTPUT=$outputfolder/aln_resorted_mdup.bam REFERENCE=$REF CREATE_INDEX=TRUE`;
+    if ($notify) { NOTIFICATION("Resorted Mark duplicates complete");  }
+  } else {
+    if ($notify) { NOTIFICATION("Resorted Mark duplicates previously completed");  }
+    print "\nVAPSTATUS:\tResorted Mark duplicates previously completed\n";
+  }
   #specified into RNAseq or DNAseq
   if ($CONFIGURE{"TYPEOFDATA"} =~ /^RNA$/i) {
-    #MARKDUPLICATES
-    $doesexist = (grep /aln_sorted_mdup.bam/, @foldercontent)[0];
-    unless ($doesexist) {
-      my $markduplicates = "java -jar $PICARDDIR MarkDuplicates INPUT=$outputfolder/aln_sorted_add.bam OUTPUT=$outputfolder/aln_sorted_mdup.bam M=$outputfolder/aln_sorted_mdup.metrics CREATE_INDEX=true";
-      `$markduplicates`;
-      if ($notify) { NOTIFICATION("Mark duplicates complete");  }
-    } else {
-      if ($notify) { NOTIFICATION("Mark duplicates previously completed");  }
-      print "\nVAPSTATUS:\tMark duplicates previously completed\n";
-    }
-    
     #SPLIT&TRIM
     $doesexist = (grep /aln_sorted_split.bam/, @foldercontent)[0];
     unless ($doesexist) {
@@ -241,24 +256,14 @@ sub VARIANTS{
     }
   }
   else {
-    #working with DNA
-    #MARKDUPLICATES
-    $doesexist = (grep /aln_sorted_mdup.bam/, @foldercontent)[0];
-    unless ($doesexist) {
-      `java -jar $PICARDDIR MarkDuplicates INPUT=$outputfolder/aln_sorted_add.bam OUTPUT=$outputfolder/aln_sorted_mdup.bam M=$outputfolder/aln_sorted_mdup.metrics CREATE_INDEX=true`;
-      if ($notify) { NOTIFICATION("Mark duplicates complete");  }
-    } else {
-      if ($notify) { NOTIFICATION("Mark duplicates previously completed");  }
-      print "\nVAPSTATUS:\tMark duplicates previously completed\n";
-    }
-    
+    #working with DNA   
     #GATK
     $doesexist = (grep /all_variants.vcf/, @foldercontent)[0];
     unless ($doesexist) {
-    `java -jar $GATKDIR -T HaplotypeCaller -R $REF -I $outputfolder/aln_sorted_mdup.bam -o $outputfolder/all_variants.vcf`;
-    `java -jar $GATKDIR -T HaplotypeCaller -R $REF -I $outputfolder/aln_sorted_mdup.bam --emitRefConfidence GVCF -o $outputfolder/all_variants_emit.vcf`;
-    `java -jar $GATKDIR -T HaplotypeCaller -R $REF -I $outputfolder/aln_sorted_mdup.bam --genotyping_mode DISCOVERY -stand_emit_conf 10 -stand_call_conf 30 -o $outputfolder/all_variants_genotype.vcf`;
-    `java -jar $GATKDIR -T HaplotypeCaller -R $REF -I $outputfolder/aln_sorted_mdup.bam --genotyping_mode DISCOVERY -stand_emit_conf 10 -stand_call_conf 30 --emitRefConfidence GVCF -o $outputfolder/all_variants_genotypeemit.vcf`;
+    `java -jar $GATKDIR -T HaplotypeCaller -R $REF -I $outputfolder/aln_resorted_mdup.bam -o $outputfolder/all_variants.vcf`;
+    `java -jar $GATKDIR -T HaplotypeCaller -R $REF -I $outputfolder/aln_resorted_mdup.bam --emitRefConfidence GVCF -o $outputfolder/all_variants_emit.vcf`;
+    `java -jar $GATKDIR -T HaplotypeCaller -R $REF -I $outputfolder/aln_resorted_mdup.bam --genotyping_mode DISCOVERY -stand_emit_conf 10 -stand_call_conf 30 -o $outputfolder/all_variants_genotype.vcf`;
+    `java -jar $GATKDIR -T HaplotypeCaller -R $REF -I $outputfolder/aln_resorted_mdup.bam --genotyping_mode DISCOVERY -stand_emit_conf 10 -stand_call_conf 30 --emitRefConfidence GVCF -o $outputfolder/all_variants_genotypeemit.vcf`;
     if ($notify) { NOTIFICATION("Haplotype caller complete");  }
     } else {
       if ($notify) { NOTIFICATION("Haplotype caller previously completed");  }
