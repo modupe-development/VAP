@@ -10,7 +10,7 @@ bwa = params.bwa
 bowtie = params.bowtie
 
 //VARIANTS
-picard = params.picard_dir
+picard = params.picard
 gatk = params.gatk
 
 //OTHERS
@@ -22,7 +22,6 @@ GFF = params.gff
 genome = params.genome
 genomeDir = params.genomeDir
 genomeIndex = params.genomeIndex
-genomeDict = params.genomeIndex + '.dict'
 params.fastq = "/home/folder/*gz"
 params.sam = "/home/folder/sam.sam"
 params.bam = "/home/folder/bam.bam"

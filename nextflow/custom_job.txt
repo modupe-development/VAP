@@ -6,35 +6,42 @@ params.star = "/home/modupe/.software/STAR/bin/Linux_x86_64/STAR"
 params.hisat = "/usr/bin/hisat2"
 params.bwa = "/usr/bin/bwa"
 params.bowtie = "/usr/bin/bowtie2"
-params.picard_dir = "/usr/local/picard-tools"
-params.gatk = "/usr/local/GATK"
+params.picard = "/usr/local/picard-tools/picard.jar"
+params.gatk = "/usr/local/GATK/GenomeAnalysisTK.jar"
 params.samtools = "/usr/local/bin/samtools"
 params.fastqc = "/home/modupe/.software/FastQC/fastqc"
 
 //######==== INPUT FILE OPTIONS ====#####
 
-params.gff = "/home/modupe/.big_ten/chicken/chicken.gff"
-params.genome = "/home/modupe/.big_ten/chicken/chicken/chicken.fa"
-params.genomeDir = "//home/modupe/.big_ten/chicken/chicken/"
-params.genomeIndex = "/home/modupe/.big_ten/chicken/chicken/chicken"
-params.fastq = false
-params.sam = "/home/modupe/RNAFayoumi/new/star/*sam"
-params.bam = "/home/modupe/RNAFayoumi/new/hisat/*bam"
-params.finalDir = "/home/modupe/testingnextflow"
+params.gff = "/home/modupe/.big_ten/chicken/chicken.gff"	//gff file
+params.genome = "/home/modupe/.big_ten/chicken/chicken/chicken.fa"	//full path + reference.fasta
+params.genomeDir = "//home/modupe/.big_ten/chicken/chicken/"	//full path to reference file and indexes
+params.genomeIndex = "/home/modupe/.big_ten/chicken/chicken/chicken"	//full path + reference index
+
+params.fastq = false	//fastq file(s) [or false]
+params.sam = "/home/modupe/RNAFayoumi/new/star/*sam"	//sam file(s) [or false]
+params.bam = "/home/modupe/RNAFayoumi/new/hisat/*bam"	//bam file(s) [or false]
+
+//######==== OUTPUT FOLDER ====#####
+
+params.finalDir = "/home/modupe/testingnextflow"	//output folder
 
 //#####################################
 
 //######==== WORKFLOW ====#####
+//specify true or false
 
 //if RNA
 params.sampleRNA = true
-//Alignment
+
+//Alignment 
 params.runTopHat = false
 params.runHISAT = false
 params.runSTAR = false
 
 //if DNA
 params.sampleDNA = false
+
 //Alignment
 params.runBWA = false
 params.runBOWTIE = false
