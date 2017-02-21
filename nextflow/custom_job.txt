@@ -1,0 +1,46 @@
+//CUSTOM CONFIGURATION FILE
+//######==== TOOL LOCATIONS     ====#####
+
+params.tophat = "/usr/bin/tophat2"
+params.star = "/home/modupe/.software/STAR/bin/Linux_x86_64/STAR"
+params.hisat = "/usr/bin/hisat2"
+params.bwa = "/usr/bin/bwa"
+params.bowtie = "/usr/bin/bowtie2"
+params.picard_dir = "/usr/local/picard-tools"
+params.gatk = "/usr/local/GATK"
+params.samtools = "/usr/local/bin/samtools"
+params.fastqc = "/home/modupe/.software/FastQC/fastqc"
+
+//######==== INPUT FILE OPTIONS ====#####
+
+params.gff = "/home/modupe/.big_ten/chicken/chicken.gff"
+params.genome = "/home/modupe/.big_ten/chicken/chicken/chicken.fa"
+params.genomeDir = "//home/modupe/.big_ten/chicken/chicken/"
+params.genomeIndex = "/home/modupe/.big_ten/chicken/chicken/chicken"
+params.fastq = false
+params.sam = "/home/modupe/RNAFayoumi/new/star/*sam"
+params.bam = "/home/modupe/RNAFayoumi/new/hisat/*bam"
+params.finalDir = "/home/modupe/testingnextflow"
+
+//#####################################
+
+//######==== WORKFLOW ====#####
+
+//if RNA
+params.sampleRNA = true
+//Alignment
+params.runTopHat = false
+params.runHISAT = false
+params.runSTAR = false
+
+//if DNA
+params.sampleDNA = false
+//Alignment
+params.runBWA = false
+params.runBOWTIE = false
+
+//DownStream
+params.runFastqc = true
+params.runVAP = false
+
+//##############################
