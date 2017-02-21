@@ -85,7 +85,7 @@ else if ( params.fastq ) {
 	if ( params.sampleRNA ) {
 		process alignTopHAT {
 			tag { sample }
-			publishDir "${params.finalDir}/${sample}", mode: 'link'
+			publishDir "${params.finalDir}/${sample}/tophat_out", mode: 'link'
 			
 			input:
 				set val(sample), file(read1), file(read2) from Sample2
@@ -103,7 +103,7 @@ else if ( params.fastq ) {
 					--library-type fr-firststrand \
 					--no-coverage-search \
 					-G $GFF \
-					-p 24 -o tophat_out \
+					-p 24 -o ./ \
 					$genome \
 					${read1} ${read2}
 	
@@ -112,7 +112,7 @@ else if ( params.fastq ) {
 	
 		process alignSTAR {
 			tag { sample }
-			publishDir "${params.finalDir}/${sample}", mode: 'link'
+			publishDir "${params.finalDir}/${sample}/star", mode: 'link'
 			
 			input:
 				set val(sample), file(read1), file(read2) from Sample3
@@ -130,7 +130,7 @@ else if ( params.fastq ) {
 				
 				$star \
 					--genomeDir $genomeDir \
-					--outFileNamePrefix star/${sample} \
+					--outFileNamePrefix ${sample} \
 					--readFilesIn ${read1} ${read2}
 	
 				"""
@@ -138,7 +138,7 @@ else if ( params.fastq ) {
 	
 		process alignHiSAT {
 			tag { sample }
-			publishDir "${params.finalDir}/${sample}", mode: 'link'
+			publishDir "${params.finalDir}/${sample}/hisat", mode: 'link'
 			
 			input:
 				set val(sample), file(read1), file(read2) from Sample4
@@ -155,8 +155,8 @@ else if ( params.fastq ) {
 				$hisat \
 					-x $genomeIndex \
 					-1 ${read1} -2 ${read2} \
-					-S hisat/${sample}.hisat.sam \
-					&> hisat/${sample}_align.txt
+					-S ${sample}.hisat.sam \
+					&> ${sample}_align.txt
 					$samtools view -bS ${sample}.hisat.sam -o ${sample}.hisat.bam
 				"""
 		}
@@ -166,7 +166,7 @@ else if ( params.fastq ) {
 	else if ( params.sampleDNA ) {
 		process alignBWA {
 			tag { sample }
-			publishDir "${params.finalDir}/${sample}", mode: 'link'
+			publishDir "${params.finalDir}/${sample}/BWA", mode: 'link'
 			
 			input:
 				set val(sample), file(read1), file(read2) from Sample2
@@ -191,7 +191,7 @@ else if ( params.fastq ) {
 		
 		process alignBOWTIE {
 			tag { sample }
-			publishDir "${params.finalDir}/${sample}", mode: 'link'
+			publishDir "${params.finalDir}/${sample}/BOWTIE", mode: 'link'
 			
 			input:
 				set val(sample), file(read1), file(read2) from Sample3
@@ -208,7 +208,7 @@ else if ( params.fastq ) {
 				$bowtie \
 					-x $genomeIndex \
 					-1 ${reads1} ${reads2} \
-					-S BOWTIE/${sample}_bowtie.sam
+					-S ${sample}_bowtie.sam
 					$samtools view -bS ${sample}_bowtie.sam -o ${sample}_bowtie.bam
 				"""
 		}
