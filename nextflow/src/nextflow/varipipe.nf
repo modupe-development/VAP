@@ -214,7 +214,7 @@ else if ( params.fastq ) {
 				"""
 				$bowtie \
 					-x $genomeIndex \
-					-1 ${reads1} ${reads2} \
+					-1 ${read1} -2 ${read2} \
 					-S ${sample}_bowtie.sam
 					$samtools view -bS ${sample}_bowtie.sam -o ${sample}_bowtie.bam
 				"""
