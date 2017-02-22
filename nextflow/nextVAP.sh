@@ -9,7 +9,9 @@ echo -e "\n =>  Processing your input files ... Sit back & relax ...\n"
 #1. VARIANT PIPE
 vari=$( echo $0 | sed s/nextVAP.sh/'src\/nextflow\/varipipe.nf'/g )
 
-nextflow run $vari -c $1 -resume > .information
+nextflow=$(which nextflow)
+
+$nextflow run $vari -c $1 -resume > .information
 cat .information
 
 
