@@ -85,14 +85,14 @@ else if ( params.fastq ) {
 	if ( params.sampleRNA ) {
 		process alignTopHAT {
 			tag { sample }
-			publishDir "${params.finalDir}/${sample}/tophat_out", mode: 'link'
+			publishDir "${params.finalDir}/${sample}/tophat", mode: 'link'
 			
 			input:
 				set val(sample), file(read1), file(read2) from Sample2
 	
 			output:
 				file '*' into alignmentOut1
-				set sample, file ('accepted*bam') into BamOut1
+				set val(sample), file ('*tophat.bam'), val('tophat') into BamOut1
 			
 			when:
 				params.runTopHat
@@ -104,9 +104,10 @@ else if ( params.fastq ) {
 					--no-coverage-search \
 					-G $GFF \
 					-p 24 -o ./ \
-					$genome \
+					$genomeIndex \
 					${read1} ${read2}
-	
+				mv accepted_hits.bam ${sample}_tophat.bam
+				
 				"""
 		}
 	
@@ -119,7 +120,7 @@ else if ( params.fastq ) {
 	
 			output:
 				file '*' into alignmentOut2
-				set sample, file ('*Aligned.bam') into BamOut2
+				set val(sample), file ('*Aligned.out.bam'), val('star') into BamOut2
 				
 			
 			when:
@@ -127,12 +128,18 @@ else if ( params.fastq ) {
 			
 			shell:
 				"""
-				
+				cp ${read1} ${read1.name.replaceFirst(/\.gz/, '2.gz')}
+				cp ${read2} ${read2.name.replaceFirst(/\.gz/, '2.gz')}
+				gunzip ${read1.name.replaceFirst(/\.gz/, '2.gz')}
+				gunzip ${read2.name.replaceFirst(/\.gz/, '2.gz')}
+                                mv ${read1.name.replaceFirst(/\.gz/, '2')} ${read1.name.replaceFirst(/\.gz/, '')}
+                                mv ${read2.name.replaceFirst(/\.gz/, '2')} ${read2.name.replaceFirst(/\.gz/, '')}
 				$star \
 					--genomeDir $genomeDir \
-					--outFileNamePrefix ${sample} \
-					--readFilesIn ${read1} ${read2}
-	
+					--outFileNamePrefix ${sample}. \
+					--readFilesIn ${read1.name.replaceFirst(/\.gz/, '')} \
+					${read2.name.replaceFirst(/\.gz/,'')}
+				$samtools view -bS ${sample}.Aligned.out.sam -o ${sample}.Aligned.out.bam
 				"""
 		}
 	
@@ -145,7 +152,7 @@ else if ( params.fastq ) {
 	
 			output:
 				file '*' into alignmentOut3
-				set sample, file ('*hisat.bam') into BamOut3
+				set val(sample), file ('*hisat.bam'), val('hisat') into BamOut3
 			
 			when:
 				params.runHISAT
@@ -173,7 +180,7 @@ else if ( params.fastq ) {
 	
 			output:
 				file '*' into alignmentOut1
-				set sample, file ('*bwa.bam') into BamOut1
+				set val(sample),file ('*bwa.bam'),val('BWA') into BamOut1
 			
 			when:
 				params.runBWA
@@ -198,7 +205,7 @@ else if ( params.fastq ) {
 	
 			output:
 				file '*' into alignmentOut2
-				set sample, file ('*bowtie.bam') into BamOut2
+				set val(sample), file ('*bowtie.bam'), val('BOWTIE') into BamOut2
 			
 			when:
 				params.runBOWTIE
@@ -227,13 +234,13 @@ else if ((params.sam) || (params.bam)) { //Dealing with a bam or sam file
 		process convertBAM {
 		//Objective : convert sam to bam file
 			tag { sample }
-			publishDir "${params.finalDir}/${sample}", mode: 'link'
+			publishDir "${params.finalDir}/${sample}/", mode: 'link'
 		
 			input:
 				set val(sample), file(reads) from SamMuxed
 	
 			output:
-				set val(sample), file ('*bam') into ConvertBam
+				set val(sample), file ('*bam'), val('.'), into ConvertBam
 	
 			script:
 				"""
@@ -247,6 +254,7 @@ else if ((params.sam) || (params.bam)) { //Dealing with a bam or sam file
 			.map {it -> [samheader(it), it ]}
 			.groupTuple (sort:true)
 			.map{ sample, reads -> tuple (sample, reads[0]) }
+			.spread(['.'])
 	}
 	
 	ConvertBam.tap{Convert}
@@ -255,10 +263,10 @@ else if ((params.sam) || (params.bam)) { //Dealing with a bam or sam file
 	process fastqc {
 	//Objective : run FastQC on Bam file 
 	  tag { sample }
-	  publishDir "${params.finalDir}/${sample}/fastqc", mode: 'link'
+	  publishDir "${params.finalDir}/${sample}/${folder}/fastqc", mode: 'link'
 	
 	  input:
-	    set val(sample), file(reads) from Convert
+	    set val(sample), file(reads), val(folder) from Convert
 
 	  when:
 	    params.runFastqc
@@ -282,14 +290,14 @@ if ( params.runVAP ) {
 	process QualityScore {
 	//Objective : create sequence dictionary
 		tag {sample}
-		publishDir "${params.finalDir}/${sample}", mode: 'link'
+		publishDir "${params.finalDir}/${sample}/${folder}", mode: 'link'
 	
 	  input:
-	    set val(sample), file(bam) from NewBam1
+	    set val(sample), file(bam), val(folder) from NewBam1
 
 	  output:
 	    set sample, file ('*') into QualityScoreOut
-			set sample, file('qualityscores.txt') into CheckQuality
+			set sample, folder, file('qualityscores.txt') into CheckQuality
 
 	  script:
 	    """
@@ -304,14 +312,14 @@ if ( params.runVAP ) {
 	process SortBam {
 	//Objective : sort bam file in co-ordinate
 		tag {sample}
-		publishDir "${params.finalDir}/${sample}", mode: 'link'
+		publishDir "${params.finalDir}/${sample}/${folder}", mode: 'link'
 	
 	  input:
-	    set val(sample), file(bam) from NewBam2
+	    set val(sample), file(bam), val(folder) from NewBam2
 
 	  output:
 	    set sample, file('*') into SortBamAll
-			set sample, file ('aln_sorted.bam') into SortBamOut
+			set sample, folder, file ('aln_sorted.bam') into SortBamOut
 
 	  script:
 	    """
@@ -326,14 +334,14 @@ if ( params.runVAP ) {
 	process AddReadGroup {
 	//Objective : add default read groups
 		tag {sample}
-		publishDir "${params.finalDir}/${sample}", mode: 'link'
+		publishDir "${params.finalDir}/${sample}/${folder}", mode: 'link'
 	
 	  input:
-	    set val(sample), file(bam) from SortBamOut
+	    set val(sample), val(folder), file(bam) from SortBamOut
 
 	  output:
 	    set sample, file ('*') into AddReadAll
-			set sample, file ('aln_sorted_add.bam') into AddReadOut
+			set sample, folder, file ('aln_sorted_add.bam') into AddReadOut
 
 	  script:
 	    """
@@ -349,14 +357,14 @@ if ( params.runVAP ) {
 	process MarkDuplicates {
 	//Objective : mark duplicates
 		tag {sample}
-		publishDir "${params.finalDir}/${sample}", mode: 'link'
+		publishDir "${params.finalDir}/${sample}/${folder}", mode: 'link'
 	
 	  input:
-	    set val(sample), file(bam) from AddReadOut
+	    set val(sample), val(folder), file(bam) from AddReadOut
 
 	  output:
 	    set sample, file ('*') into MarkDupAll
-			set sample, file ('aln_sorted_mdup.bam'), file ('aln_sorted_mdup.bai') into MarkDupOut
+			set sample, folder, file ('aln_sorted_mdup.bam'), file ('aln_sorted_mdup.bai') into MarkDupOut
 
 	  script:
 	    """
@@ -372,14 +380,14 @@ if ( params.runVAP ) {
 	process ReOrderSam {
 	//Objective : reordering bam file to match with reference file
 		tag {sample}
-		publishDir "${params.finalDir}/${sample}", mode: 'link'
+		publishDir "${params.finalDir}/${sample}/${folder}", mode: 'link'
 	
 	  input:
-	    set val(sample), file(bam), file(bai) from MarkDupOut
+	    set val(sample), val(folder), file(bam), file(bai) from MarkDupOut
 
 	  output:
 	    set sample, file ('*') into ReOrderAll
-			set sample, file ('aln_resorted_mdup.bam'), ile ('aln_resorted_mdup.bai')into ReOrderOut
+			set sample, folder, file ('aln_resorted_mdup.bam'), file ('aln_resorted_mdup.bai')into ReOrderOut
 
 	  script:
 	    """
@@ -399,53 +407,50 @@ if ( params.runVAP ) {
 		process SplitTrim {
 		//Objective : split and trim reads
 			tag {sample}
-			publishDir "${params.finalDir}/${sample}", mode: 'link'
+			publishDir "${params.finalDir}/${sample}/${folder}", mode: 'link'
 		
 			input:
 				set sample, file(quality) from CheckQuality
-				set val(sample), file(bam), file(bai) from ReOrderOut1
+				set val(sample), val(folder), file(bam), file(bai) from ReOrderOut1
 	
 			output:
 				set sample, file ('*') into SplitTrimAll
-				set sample, file ('aln_sorted_split.bam'), file ('aln_sorted_split.bai') into SplitTrimOut
+				set sample, folder, file ('aln_sorted_split.bam'), file ('aln_sorted_split.bai') into SplitTrimOut
 	
 			shell:
-				"""
-				for i in `tail -n2 ${quality} | head -n 1 | awk -F" " '{print \$1}'` \
+				'''
+				for i in `tail -n2 !{quality} | head -n 1 | awk -F" " '{print $1}'`; 
 					do
-						if [ $i -ge 59 ] \
-							then
-								java -jar $gatk \
+						if [ $i -ge 59 ]; then
+							`java -jar !{gatk} \
 								-T SplitNCigarReads \
 								--fix_misencoded_quality_scores \
-								-R $genome \
-								-I ${bam} \
+								-R !{genome} -I !{bam} \
 								-o aln_sorted_split.bam \
 								-rf ReassignOneMappingQuality \
-								-RMQF 255 -RMQT 60 --filter_reads_with_N_cigar \
-						else \
-							java -jar $gatk \
-								-T SplitNCigarReads \
-								-R $genome \
-								-I ${bam} \
-								-o aln_sorted_split.bam \
-								-rf ReassignOneMappingQuality \
-								-RMQF 255 -RMQT 60 --filter_reads_with_N_cigar
-						fi \
+								-RMQF 255 -RMQT 60 --filter_reads_with_N_cigar`
+						else 
+							`java -jar !{gatk} \
+							-T SplitNCigarReads \
+							-R !{genome} -I !{bam} \
+							-o aln_sorted_split.bam \
+							-rf ReassignOneMappingQuality \
+							-RMQF 255 -RMQT 60 --filter_reads_with_N_cigar` 
+						fi
 					done
-				"""
+				'''
 		}
 		
 		process HaplotypeCallRNA {
 		//Objective : call variants
 			tag {sample}
-			publishDir "${params.finalDir}/${sample}", mode: 'link'
+			publishDir "${params.finalDir}/${sample}/${folder}", mode: 'link'
 		
 			input:
-				set val(sample), file(bam), file(bai) from SplitTrimOut
+				set val(sample), val(folder), file(bam), file(bai) from SplitTrimOut
 	
 			output:
-				set sample, file ('*') into VariantsAll
+				set sample, folder, file ('*') into VariantsAll
 				
 			script:
 				"""
@@ -461,13 +466,13 @@ if ( params.runVAP ) {
 		process HaplotypeCallDNA {
 		//Objective : call variants
 			tag {sample}
-			publishDir "${params.finalDir}/${sample}", mode: 'link'
+			publishDir "${params.finalDir}/${sample}/${folder}", mode: 'link'
 		
 			input:
-				set val(sample), file(bam), file(bai) from ReOrderOut1
+				set val(sample), val(folder), file(bam), file(bai) from ReOrderOut1
 
 			output:
-				set sample, file ('*') into VariantsAll
+				set sample, folder, file ('*') into VariantsAll
 				
 			script:
 				"""
@@ -481,13 +486,13 @@ if ( params.runVAP ) {
 		process HC_DNAEmit {
 		//Objective : call variants; emit reference confidence
 			tag {sample}
-			publishDir "${params.finalDir}/${sample}", mode: 'link'
+			publishDir "${params.finalDir}/${sample}/${folder}", mode: 'link'
 		
 			input:
-				set val(sample), file(bam), file(bai) from ReOrderOut2
+				set val(sample), val(folder), file(bam), file(bai) from ReOrderOut2
 
 			output:
-				set sample, file ('*') into VariantsAllEmit
+				set sample, folder, file ('*') into VariantsAllEmit
 				
 			script:
 				"""
