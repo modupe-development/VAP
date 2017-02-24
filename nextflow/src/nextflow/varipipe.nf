@@ -330,7 +330,6 @@ if ( params.runVAP ) {
 	
 	process SortBam {
 	//Objective : sort bam file in co-ordinate
-		validExitStatus 137,0
 		tag {stat}
 		publishDir "${params.finalDir}/${sample}/${folder}", mode: 'link'
 	
@@ -377,7 +376,6 @@ if ( params.runVAP ) {
 	
 	process MarkDuplicates {
 	//Objective : mark duplicates
-		validExitStatus 137,0
 		tag {stat}
 		publishDir "${params.finalDir}/${sample}/${folder}", mode: 'link'
 	
