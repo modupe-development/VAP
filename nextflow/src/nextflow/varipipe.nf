@@ -293,8 +293,8 @@ else if ((params.sam) || (params.bam)) { //Dealing with a bam or sam file
 	  script:
 	    """
 	    $fastqc ${reads}
-            unzip ${reads.name.replaceFirst(/\.fastq\.gz/, '_fastqc.zip')}
-	    cp ${reads.name.replaceFirst(/\.fastq\.gz/, '_fastqc')}/summary.txt ${reads.name.replaceFirst(/\.fastq.gz/, '.txt')}
+            unzip ${reads.name.replaceFirst(/\.bam/, '_fastqc.zip')}
+	    cp ${reads.name.replaceFirst(/\.bam/, '_fastqc')}/summary.txt ${reads.name.replaceFirst(/\.fastq.gz/, '.txt')}
 	    """
 	}
 } else {
