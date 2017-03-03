@@ -18,16 +18,10 @@ cat .information
 #Determine VARIANT PIPE status
 status=( $(grep "Execution status" .information | wc -m) )
 
-if [-n "$2"]
-  then
-  if [$2 == "clean"]
-    then
-    if [ $status = 26 ]
-    then
-      echo -e "\tRemoving temporary files"
-      rm -rf work/ .information .nextflow.* trace_pipeline.txt*
-    fi
-  fi
+if [ $status = 26 ];
+then
+  echo -e "\tRemoving temporary files"
+  rm -rf work/ .information .nextflow.* trace_pipeline.txt*
 fi
 echo
 echo -e "\t\t...The End..."
