@@ -25,6 +25,7 @@ genomeIndex = params.genomeIndex
 params.fastq = "/home/folder/*gz"
 params.sam = "/home/folder/sam.sam"
 params.bam = "/home/folder/bam.bam"
+params.threads = 1
 
 //PARENT OUTPUT FOLDER
 params.finalDir = "/home/final"
@@ -101,10 +102,11 @@ else if ( params.fastq ) {
 			shell:
 				"""
 				$tophat \
+					-p ${threads} \
 					--library-type fr-firststrand \
 					--no-coverage-search \
 					-G $GFF \
-					-p 24 -o ./ \
+					-o ./ \
 					$genomeIndex \
 					${read1} ${read2}
 				mv accepted_hits.bam ${sample}.tophat.bam
@@ -137,6 +139,7 @@ else if ( params.fastq ) {
                                 mv ${read1.name.replaceFirst(/\.gz/, '2')} ${read1.name.replaceFirst(/\.gz/, '')}
                                 mv ${read2.name.replaceFirst(/\.gz/, '2')} ${read2.name.replaceFirst(/\.gz/, '')}
 				$star \
+					--runThreadN 16 \
 					--genomeDir $genomeDir \
 					--outFileNamePrefix ${sample}. \
 					--readFilesIn ${read1.name.replaceFirst(/\.gz/, '')} \
@@ -163,6 +166,7 @@ else if ( params.fastq ) {
 			shell:
 				"""
 				$hisat \
+					-p ${threads} \
 					-x $genomeIndex \
 					-1 ${read1} -2 ${read2} \
 					-S ${sample}.hisat.sam \
@@ -195,6 +199,7 @@ else if ( params.fastq ) {
 				"""
 				$bwa \
 					mem \
+					-t ${threads} \
 					$genome \
 					${read1} ${read2} \
 					> ${sample}_bwa.sam
@@ -220,6 +225,7 @@ else if ( params.fastq ) {
 			shell:
 				"""
 				$bowtie \
+					-p ${threads} \
 					-x $genomeIndex \
 					-1 ${read1} -2 ${read2} \
 					-S ${sample}_bowtie.sam

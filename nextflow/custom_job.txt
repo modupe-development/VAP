@@ -15,12 +15,16 @@ params.fastqc = "/home/modupe/.software/FastQC/fastqc"
 
 params.gff = "/home/modupe/.big_ten/chicken/chicken.gff"	//gff file
 params.genome = "/home/modupe/.big_ten/chicken/chicken/chicken.fa"	//full path + reference.fasta
-params.genomeDir = "//home/modupe/.big_ten/chicken/chicken/"	//full path to reference file and indexes
+params.genomeDir = "/home/modupe/.big_ten/chicken/chicken/"	//full path to reference file and indexes
 params.genomeIndex = "/home/modupe/.big_ten/chicken/chicken/chicken"	//full path + reference index
 
 params.fastq = false	//fastq file(s) [or false]
 params.sam = "/home/modupe/RNAFayoumi/new/star/*sam"	//sam file(s) [or false]
 params.bam = "/home/modupe/RNAFayoumi/new/hisat/*bam"	//bam file(s) [or false]
+
+//######==== OPTIONS ====#####
+
+params.threads = 16 //number of threads for alignment process
 
 //######==== OUTPUT FOLDER ====#####
 
