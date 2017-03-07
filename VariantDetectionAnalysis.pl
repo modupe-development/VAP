@@ -155,14 +155,14 @@ sub processor { #queueing the thread
 }
 
 sub parseinput{ #what is done in each thread
-  print "Submitted $_[0] ",`date +%x-%X`;
+  print "Submitted\t$_[0]\t",`date +%x-%X`;
   system("perl $_[0] 1>$_[0].log 2>$_[0].err");
 	system("echo 'from $_[0].log' >> $outputfolder/$std_out");
   system("echo 'from $_[0].err' >> $outputfolder/$std_err");
   system("cat $_[0].log >> $outputfolder/$std_out");
   system("cat $_[0].err >> $outputfolder/$std_err");
 	system("cat $_[0].notice.log >> $outputfolder/welcome-$date.log");
-	print "Completed $_[0] ",`date +%x-%X`;
+	print "Completed\t$_[0]\t",`date +%x-%X`;
 }
 
 sub configureinput {
@@ -561,9 +561,9 @@ my $file = `tail -n2 qualityscores.txt | head -n 1 | awk -F" " '{print \$1}'`;
 if ($file >= 59) {
 ENDCODES
 $codes .= <<"ENDCODES";
-`java -jar $GATK -T SplitNCigarReads --fix_misencoded_quality_scores -R $REF -I aln_sorted_mdup.bam -o aln_sorted_split.bam -rf ReassignOneMappingQuality -RMQF 255 -RMQT 60 --filter_reads_with_N_cigar`;
+`java -jar $GATK -T SplitNCigarReads --fix_misencoded_quality_scores -R $REF -I aln_resorted_mdup.bam -o aln_sorted_split.bam -rf ReassignOneMappingQuality -RMQF 255 -RMQT 60 --filter_reads_with_N_cigar`;
 } else {
-`java -jar $GATK -T SplitNCigarReads -R $REF -I aln_sorted_mdup.bam -o aln_sorted_split.bam -rf ReassignOneMappingQuality -RMQF 255 -RMQT 60 --filter_reads_with_N_cigar`;
+`java -jar $GATK -T SplitNCigarReads -R $REF -I aln_resorted_mdup.bam -o aln_sorted_split.bam -rf ReassignOneMappingQuality -RMQF 255 -RMQT 60 --filter_reads_with_N_cigar`;
 }
 ENDCODES
 
