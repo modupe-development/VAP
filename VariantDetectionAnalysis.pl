@@ -112,27 +112,16 @@ elsif ( ($CONFIGURE{"BAM"} ne "false") || ($CONFIGURE{"SAM"} ne "false") ) {
   }
 }
 
-
-#my $max_procs = 10;
-#
-#my $pm =  new Parallel::ForkManager($max_procs);
-#foreach my $inc (@arrayfile){
-#  my $pid = $pm->start and next;
-#  print "$inc working\n";
-#  print system ("perl $inc 1>$inc.log 2>$inc.err");
-#  $pm->finish; # pass an exit code to finish
-#  print "All codes are completed\n";
-#  `cat $inc.log >> $outputfolder/$std_out`;
-#  `cat $inc.err >> $outputfolder/$std_err`;
-#}
-
 my $queue = new Thread::Queue();
 my $builder=threads->create(\&main); #create thread for each subarray into a thread
 push @threads, threads->create(\&processor) for 1..5; #execute 10 threads
 $builder->join; #join threads
 foreach (@threads){$_->join;}
 
-system "mail -s \"VAP - $subject\" $email < $outputfolder/welcome-$date.log";
+#end of job
+`echo "Job Completed" >>  $outputfolder/welcome-$date.log` if $notify;
+system "mail -s \"VAP - $subject\" $email < $outputfolder/welcome-$date.log" if $notify;
+
 
 ##SUBROUTINES
 sub main { #main thread routine
