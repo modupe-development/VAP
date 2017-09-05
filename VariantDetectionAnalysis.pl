@@ -11,7 +11,7 @@ use threads;
 use Thread::Queue;
 
 #tools
-our ($TOPHAT, $BOWTIE, $PICARD, $GATK, $HISAT, $FASTQC, $STAR, $SAMTOOLS, $BWA);
+our ($TOPHAT, $BOWTIE, $PICARD, $GATK, $HISAT, $FASTQC, $STAR, $SAMTOOLS, $BCFTOOLS, $BWA);
 
 #files
 our ($value, %CONFIGURE, %FILE, @content, @arrayfile, @threads);
@@ -35,7 +35,7 @@ GetOptions (
 # VALIDATE ARGS
 pod2usage( -verbose => 2 )  if ($manual);
 pod2usage( -verbose => 1 )  if ($help);
-pod2usage( -msg  => "ERROR!  Required argument(s) are not found.\n", -exitval => 2, -verbose => 1)  if (! $config);
+pod2usage( -msg  => "ERROR!  Required argument '-c <config_file>' not found.\n", -exitval => 2, -verbose => 1)  if (! $config);
 @ARGV == 0 || pod2usage("ERROR! Additional comments '@ARGV' not required\n");
 
 configureinput(); #configure input options
@@ -88,29 +88,80 @@ ENDNOTIFY
 #PROCESSING
 if ($CONFIGURE{"FASTQ"} ne "false") {
   foreach (keys %FILE){
-    if ($CONFIGURE{"RUNFASTQC"} eq "true"){ $newout = "$outputfolder/tmp/$_-fastqc.txt"; push @arrayfile, $newout; open (OUT, ">$newout"); print OUT "#!/usr/bin/perl\n$endnotify\n"; close (OUT); FASTQC($_, $FILE{$_}, $newout); }
-    if ($CONFIGURE{"SAMPLERNA"} eq "true") {
-      if ($CONFIGURE{"RUNTOPHAT"} eq "true"){ $newout = "$outputfolder/tmp/$_-tophat.txt"; push @arrayfile, $newout; open (OUT, ">$newout"); print OUT "#!/usr/bin/perl\n$endnotify\n"; close (OUT); TOPHAT($_, $FILE{$_}, $newout); }
-      if ($CONFIGURE{"RUNHISAT"} eq "true"){ $newout = "$outputfolder/tmp/$_-hisat.txt"; push @arrayfile, $newout; open (OUT, ">$newout"); print OUT "#!/usr/bin/perl\n$endnotify\n"; close (OUT); HISAT($_, $FILE{$_}, $newout); }
-      if ($CONFIGURE{"RUNSTAR"} eq "true"){ $newout = "$outputfolder/tmp/$_-star.txt"; push @arrayfile, $newout; open (OUT, ">$newout"); print OUT "#!/usr/bin/perl\n$endnotify\n"; close (OUT); STAR($_, $FILE{$_}, $newout); }
-    } elsif ($CONFIGURE{"SAMPLEDNA"} eq "true") {
-      if ($CONFIGURE{"RUNBOWTIE"} eq "true"){ $newout = "$outputfolder/tmp/$_-bowtie.txt"; push @arrayfile, $newout; open (OUT, ">$newout"); print OUT "#!/usr/bin/perl\n$endnotify\n"; close (OUT); BOWTIE($_, $FILE{$_}, $newout); }
-      if ($CONFIGURE{"RUNBWA"} eq "true"){ $newout = "$outputfolder/tmp/$_-bwa.txt"; push @arrayfile, $newout; open (OUT, ">$newout"); print OUT "#!/usr/bin/perl\n$endnotify\n"; close (OUT); BWA($_, $FILE{$_}, $newout); }
-    }
-  }
-}
-elsif ( ($CONFIGURE{"BAM"} ne "false") || ($CONFIGURE{"SAM"} ne "false") ) {
-  my $nac = "RNA";
-  if ($CONFIGURE{"SAMPLEDNA"} eq "true") { $nac = "DNA"; }
-  elsif ($CONFIGURE{"SAMPLERNA"} eq "true") { $nac = "RNA"; }
+    if ($CONFIGURE{"RUNFASTQC"} eq "true") {
+			$newout = "$outputfolder/tmp/$_-fastqc.txt";
+			push @arrayfile, $newout; open (OUT, ">$newout");
+			print OUT "#!/usr/bin/perl\n$endnotify\n"; close (OUT);
+			FASTQC($_, $FILE{$_}, $newout);
+		} #fastqc
+    if ($CONFIGURE{"SAMPLERNA"} eq "true") { #rna
+      if ($CONFIGURE{"RUNTOPHAT"} eq "true"){
+				$newout = "$outputfolder/tmp/$_-tophat.txt";
+				push @arrayfile, $newout;
+				open (OUT, ">$newout");
+				print OUT "#!/usr/bin/perl\n$endnotify\n"; close (OUT);
+				TOPHAT($_, $FILE{$_}, $newout);
+			} #tophat
+      if ($CONFIGURE{"RUNHISAT"} eq "true"){
+				$newout = "$outputfolder/tmp/$_-hisat.txt";
+				push @arrayfile, $newout;
+				open (OUT, ">$newout");
+				print OUT "#!/usr/bin/perl\n$endnotify\n"; close (OUT);
+				HISAT($_, $FILE{$_}, $newout);
+			} #hisat
+      if ($CONFIGURE{"RUNSTAR"} eq "true"){
+				$newout = "$outputfolder/tmp/$_-star.txt";
+				push @arrayfile, $newout;
+				open (OUT, ">$newout");
+				print OUT "#!/usr/bin/perl\n$endnotify\n"; close (OUT);
+				STAR($_, $FILE{$_}, $newout);
+			} #star
+    } elsif ($CONFIGURE{"SAMPLEDNA"} eq "true") { #dna
+      if ($CONFIGURE{"RUNBOWTIE"} eq "true"){
+				$newout = "$outputfolder/tmp/$_-bowtie.txt";
+				push @arrayfile, $newout;
+				open (OUT, ">$newout");
+				print OUT "#!/usr/bin/perl\n$endnotify\n"; close (OUT);
+				BOWTIE($_, $FILE{$_}, $newout);
+			} #bowtie
+      if ($CONFIGURE{"RUNBWA"} eq "true"){
+				$newout = "$outputfolder/tmp/$_-bwa.txt";
+				push @arrayfile, $newout;
+				open (OUT, ">$newout");
+				print OUT "#!/usr/bin/perl\n$endnotify\n"; close (OUT);
+				BWA($_, $FILE{$_}, $newout);
+			} #bwa
+    } #end sequence type
+  } #end file
+} #end if fastq file
+elsif ( ($CONFIGURE{"BAM"} ne "false") || ($CONFIGURE{"SAM"} ne "false") ) { #if bam or sam file
+  my $nac = "RNA"; #default is RNA
+  if ($CONFIGURE{"SAMPLEDNA"} eq "true") { $nac = "DNA"; } #if dna
+  elsif ($CONFIGURE{"SAMPLERNA"} eq "true") { $nac = "RNA"; } #if rna
   foreach (keys %FILE){
-    if ($CONFIGURE{"RUNFASTQC"} eq "true"){ $newout = "$outputfolder/tmp/$_-fastqc.txt"; push @arrayfile, $newout; open (OUT, ">$newout"); print OUT "#!/usr/bin/perl\n$endnotify\n"; close (OUT); FASTQC($_, $FILE{$_}, $newout); }
-    if ($CONFIGURE{"RUNVAP"} eq "true"){
-      if ($CONFIGURE{"SAM"} ne "false") { $newout = "$outputfolder/tmp/$_-sam.txt"; push @arrayfile, $newout; open (OUT, ">$newout"); print OUT "#!/usr/bin/perl\n$endnotify\n"; close (OUT); SAMBAM($_, $FILE{$_}, $newout, $nac);}
-      else { $newout = "$outputfolder/tmp/$_-bam.txt"; push @arrayfile, $newout; open (OUT, ">$newout"); print OUT "#!/usr/bin/perl\n$endnotify\n"; close (OUT); VAP($_, $FILE{$_}, $newout,$nac, $_); }
-    }
-  }
-}
+    if ($CONFIGURE{"RUNFASTQC"} eq "true"){
+			$newout = "$outputfolder/tmp/$_-fastqc.txt";
+			push @arrayfile, $newout;
+			open (OUT, ">$newout"); print OUT "#!/usr/bin/perl\n$endnotify\n"; close (OUT);
+			FASTQC($_, $FILE{$_}, $newout);
+		} #fastqc
+    if ($CONFIGURE{"RUNVAP"} eq "true"){ #run variant analysis pipeline
+      if ($CONFIGURE{"SAM"} ne "false") { #if sam file
+				$newout = "$outputfolder/tmp/$_-sam.txt";
+				push @arrayfile, $newout;
+				open (OUT, ">$newout");
+				print OUT "#!/usr/bin/perl\n$endnotify\n"; close (OUT);
+				SAMBAM($_, $FILE{$_}, $newout, $nac);
+			} else {
+				$newout = "$outputfolder/tmp/$_-bam.txt";
+				push @arrayfile, $newout;
+				open (OUT, ">$newout");
+				print OUT "#!/usr/bin/perl\n$endnotify\n"; close (OUT);
+				VAP($_, $FILE{$_}, $newout,$nac, $_);
+			} #end if sam or bam file
+    } #end if run vap
+  } # end file
+} #end if bam or sam file
 
 my $queue = new Thread::Queue();
 my $builder=threads->create(\&main); #create thread for each subarray into a thread
@@ -173,6 +224,7 @@ sub configureinput {
   $PICARD=$CONFIGURE{"PICARD"};
   $FASTQC=$CONFIGURE{"FASTQC"};
   $SAMTOOLS=$CONFIGURE{"SAMTOOLS"};
+	$BCFTOOLS=$CONFIGURE{"BCFTOOLS"};
   $HISAT=$CONFIGURE{"HISAT"};
   $BWA=$CONFIGURE{"BWA"};
   $STAR=$CONFIGURE{"STAR"};
@@ -305,7 +357,7 @@ print OUT "$codes\n";
   }
   close OUT;
   if($CONFIGURE{"RUNVAP"} eq "true") {
-    VAP($_, "$sample.tophat.bam", $outted, "RNA", "$sample/tophat");
+    VAP($_, "$outputfolder/$sample/tophat/$sample.tophat.bam", $outted, "RNA", "$sample/tophat");
   }
   
 }
@@ -331,10 +383,10 @@ print OUT "$codes\n";
     my $starstat = "$STAR --runThreadN $THREADS --genomeDir $CONFIGURE{'GENOMEDIR'} --outFileNamePrefix $sample. --readFilesIn ";
     foreach my $single (@eachread) {
       my $singlefolder = fileparse($single);
-      $singlefolder =~ s/fastq\.gz/fastq/g;
+      $singlefolder =~ s/q\.gz/q/g;
       $starstat .= "$singlefolder ";
     }
-  
+
 $codes = <<"ENDCODES";
 `cp $reads ./`;
 `gunzip *gz`;
@@ -344,11 +396,11 @@ ENDCODES
 
 print OUT "$codes\n";
 
-  if ($notify) { print OUT "NOTIFICATION(\"$sample - STAR complete\");\n";  }
+    if ($notify) { print OUT "NOTIFICATION(\"$sample - STAR complete\");\n";  }
   }
   close OUT;
-  if($CONFIGURE{"RUNVAP"} eq "true") {
-    VAP($_, "$sample.star.bam", $outted, "RNA","$sample/star");
+  if ($CONFIGURE{"RUNVAP"} eq "true") {
+    VAP($_, "$outputfolder/$sample/star/$sample.star.bam", $outted, "RNA","$sample/star");
   }
   
 }
@@ -370,9 +422,14 @@ print OUT "$codes\n";
  
   
   $doesexist = (grep /hisat\.bam/, (split("\n", `find ./`)))[0];
+	my $hisatstat;
   unless ($doesexist) {
     @eachread = split(/\s/, $reads);
-    my $hisatstat = "$HISAT -p $THREADS -x $CONFIGURE{'GENOMEINDEX'} -S $sample.hisat.sam -1 $eachread[0] -2 $eachread[1] &> $sample"."_align.txt";
+		if ($#eachread >= 1){ 
+			$hisatstat = "$HISAT -p $THREADS -x $CONFIGURE{'GENOMEINDEX'} -S $sample.hisat.sam -1 $eachread[0] -2 $eachread[1] 2> $sample"."_align.txt";
+		} else {
+			$hisatstat = "$HISAT -p $THREADS -x $CONFIGURE{'GENOMEINDEX'} -S $sample.hisat.sam -U $eachread[0] 2> $sample"."_align.txt";
+		}
 $codes = <<"ENDCODES";
 `$hisatstat`;
 `$SAMTOOLS view -bS $sample.hisat.sam -o $sample.hisat.bam`;
@@ -384,7 +441,7 @@ print OUT "$codes\n";
   }
   close OUT;
   if($CONFIGURE{"RUNVAP"} eq "true") {
-    VAP($_, "$sample.hisat.bam", $outted, "RNA", "$sample/hisat");
+    VAP($_, "$outputfolder/$sample/hisat/$sample.hisat.bam", $outted, "RNA", "$sample/hisat");
   }
 }
 
@@ -488,63 +545,67 @@ $codes = <<"ENDCODES";
 chdir("$outputfolder");
 `mkdir -p $_[4]`;
 chdir ("$_[4]");
+my \$locale=`pwd`; chomp \$locale;
 ENDCODES
 
- open (OUT, ">>$outted");
- print OUT "$codes\n";
+	open (OUT, ">>$outted");
+	print OUT "$codes\n";
  
-  #QUALITY SCORE DISTRIBUTION
-  $doesexist = (grep /qualityscores.txt/, (split("\n", `find ./`)))[0];
-  unless ($doesexist) {
-    print OUT "`java -jar $PICARD QualityScoreDistribution INPUT=$reads OUTPUT=qualityscores.txt CHART=qualityscores.chart`;\n";
-    if ($notify) { print OUT "NOTIFICATION(\"$sample - Quality Score Distribution complete\");\n";  }
-  } else {
-    if ($notify) { print OUT "NOTIFICATION(\"$sample - Quality Score Distribution previously completed\");\n";  }
-  }
-  
-  #SORT BAM
-  $doesexist = (grep /aln_sorted.bam/, (split("\n", `find ./`)))[0];
-  unless ($doesexist) {
-  print OUT "`java -jar $PICARD SortSam INPUT=$_[1] OUTPUT=aln_sorted.bam SO=coordinate`;\n";
-    if ($notify) { print OUT "NOTIFICATION(\"$sample - Sort Bam complete\");\n";  }
-  } else {
-    if ($notify) { print OUT "NOTIFICATION(\"$sample - Sort Bam previously completed\");\n";  }
-  }
-  
-  #ADDREADGROUPS
-  $doesexist = (grep /aln_sorted_add.bam/, (split("\n", `find ./`)))[0];
-  unless ($doesexist) {
-    print OUT "`java -jar $PICARD AddOrReplaceReadGroups INPUT=aln_sorted.bam OUTPUT=aln_sorted_add.bam SO=coordinate RGID=Label RGLB=Label RGPL=illumina RGPU=Label RGSM=Label`;\n";
-    if ($notify) { print OUT "NOTIFICATION(\"$sample - Add read groups complete\");\n";  }
-  } else {
-    if ($notify) { print OUT "NOTIFICATION(\"$sample - Add read groups previously completed\");\n";  }
-  }
-  
-  #MARKDUPLICATES
-  $doesexist = (grep /aln_sorted_mdup.bam/, (split("\n", `find ./`)))[0];
-  unless ($doesexist) {
-    print OUT "`java -jar $PICARD MarkDuplicates INPUT=aln_sorted_add.bam OUTPUT=aln_sorted_mdup.bam M=aln_sorted_mdup.metrics CREATE_INDEX=true`;\n";
-    if ($notify) { print OUT "NOTIFICATION(\"$sample - Mark duplicates complete\");\n";  }
-  } else {
-    if ($notify) { print OUT "NOTIFICATION(\"$sample - Mark duplicates previously completed\");\n";  }
-  }
-  
-  #REORDER SAM
-  $doesexist = (grep /aln_resorted_mdup.bam/, (split("\n", `find ./`)))[0];
-  unless ($doesexist) {
-    print OUT "`java -jar $PICARD ReorderSam INPUT=aln_sorted_mdup.bam OUTPUT=aln_resorted_mdup.bam REFERENCE=$REF CREATE_INDEX=TRUE`;\n";
-    if ($notify) { print OUT "NOTIFICATION(\"$sample - Resorted Mark duplicates complete\");\n";  }
-  } else {
-    if ($notify) { print OUT "NOTIFICATION(\"$sample - Resorted Mark duplicates previously completed\");\n";  }
-  }
-  
-  #specified into RNAseq or DNAseq
-  if ($_[3] eq "RNA") {
-    
-    #SPLIT&TRIM
-    $doesexist = (grep /aln_sorted_split.bam/, (split("\n", `find ./`)))[0];
-    unless ($doesexist) {
-      
+ if($CONFIGURE{"RUNGATK"} eq "true") {
+		print OUT '`mkdir -p $locale/variants/GATK`;',"\n",'chdir("$locale/variants/GATK");',"\n";
+		
+		#QUALITY SCORE DISTRIBUTION
+		$doesexist = (grep /GATK\/qualityscores.txt/, (split("\n", `find ./`)))[0];
+		unless ($doesexist) {
+			print OUT "`java -jar $PICARD QualityScoreDistribution INPUT=$reads OUTPUT=qualityscores.txt CHART=qualityscores.chart`;\n";
+			if ($notify) { print OUT "NOTIFICATION(\"$sample - Quality Score Distribution complete\");\n";  }
+		} else {
+			if ($notify) { print OUT "NOTIFICATION(\"$sample - Quality Score Distribution previously completed\");\n";  }
+		}
+		
+		#SORT BAM
+		$doesexist = (grep /GATK\/aln_sorted.bam/, (split("\n", `find ./`)))[0];
+		unless ($doesexist) {
+		print OUT "`java -jar $PICARD SortSam INPUT=$_[1] OUTPUT=aln_sorted.bam SO=coordinate`;\n";
+			if ($notify) { print OUT "NOTIFICATION(\"$sample - Sort Bam complete\");\n";  }
+		} else {
+			if ($notify) { print OUT "NOTIFICATION(\"$sample - Sort Bam previously completed\");\n";  }
+		}
+		
+		#ADDREADGROUPS
+		$doesexist = (grep /GATK\/aln_sorted_add.bam/, (split("\n", `find ./`)))[0];
+		unless ($doesexist) {
+			print OUT "`java -jar $PICARD AddOrReplaceReadGroups INPUT=aln_sorted.bam OUTPUT=aln_sorted_add.bam SO=coordinate RGID=Label RGLB=Label RGPL=illumina RGPU=Label RGSM=Label`;\n";
+			if ($notify) { print OUT "NOTIFICATION(\"$sample - Add read groups complete\");\n";  }
+		} else {
+			if ($notify) { print OUT "NOTIFICATION(\"$sample - Add read groups previously completed\");\n";  }
+		}
+		
+		#MARKDUPLICATES
+		$doesexist = (grep /GATK\/aln_sorted_mdup.bam/, (split("\n", `find ./`)))[0];
+		unless ($doesexist) {
+			print OUT "`java -jar $PICARD MarkDuplicates INPUT=aln_sorted_add.bam OUTPUT=aln_sorted_mdup.bam M=aln_sorted_mdup.metrics CREATE_INDEX=true`;\n";
+			if ($notify) { print OUT "NOTIFICATION(\"$sample - Mark duplicates complete\");\n";  }
+		} else {
+			if ($notify) { print OUT "NOTIFICATION(\"$sample - Mark duplicates previously completed\");\n";  }
+		}
+		
+		#REORDER SAM
+		$doesexist = (grep /GATK\/aln_resorted_mdup.bam/, (split("\n", `find ./`)))[0];
+		unless ($doesexist) {
+			print OUT "`java -jar $PICARD ReorderSam INPUT=aln_sorted_mdup.bam OUTPUT=aln_resorted_mdup.bam REFERENCE=$REF CREATE_INDEX=TRUE`;\n";
+			if ($notify) { print OUT "NOTIFICATION(\"$sample - Resorted Mark duplicates complete\");\n";  }
+		} else {
+			if ($notify) { print OUT "NOTIFICATION(\"$sample - Resorted Mark duplicates previously completed\");\n";  }
+		}
+		
+		#specified into RNAseq or DNAseq
+		if ($_[3] eq "RNA") {
+			
+			#SPLIT&TRIM
+			$doesexist = (grep /GATK\/aln_sorted_split.bam/, (split("\n", `find ./`)))[0];
+			unless ($doesexist) {
+				
 $codes = <<'ENDCODES';
 my $file = `tail -n2 qualityscores.txt | head -n 1 | awk -F" " '{print \$1}'`;
 if ($file >= 59) {
@@ -557,32 +618,63 @@ $codes .= <<"ENDCODES";
 ENDCODES
 
 print OUT "$codes\n";
-
-      if ($notify) { print OUT "NOTIFICATION(\"$sample - SplitNCigars complete\");\n";  }
-    } else {
-      if ($notify) { print OUT "NOTIFICATION(\"$sample - SplitNCigars previously completed\");\n";  }
-    }
-    
-    #GATK
-    $doesexist = (grep /$_[0]_all.vcf/, (split("\n", `find ./`)))[0];
-    unless ($doesexist) {
-      print OUT "`java -jar $GATK -T HaplotypeCaller -R $REF -I aln_sorted_split.bam -o $_[0]_all.vcf`;\n";
-      if ($notify) { print OUT "NOTIFICATION(\"$sample - Haplotype caller complete\");\n";  }
-    } else {
-      if ($notify) { print OUT "NOTIFICATION(\"$sample - Haplotype caller previously completed\");\n";  }
-    }
-  }
-  else {  #working with DNA   
-    #GATK
-    $doesexist = (grep /$_[0]_all.vcf/, (split("\n", `find ./`)))[0];
-    unless ($doesexist) {
-      print OUT "`java -jar $GATK -T HaplotypeCaller -R $REF -I aln_resorted_mdup.bam -o $_[0]_all.vcf`;\n";
-      print OUT "`java -jar $GATK -T HaplotypeCaller -R $REF -I aln_resorted_mdup.bam --emitRefConfidence GVCF -o $_[0]_all_emit.vcf`;\n";
-      if ($notify) { print OUT "NOTIFICATION(\"$sample - Haplotype caller complete\");\n";  }
-    } else {
-      if ($notify) { print OUT "NOTIFICATION(\"$sample - Haplotype caller previously completed\");\n";  }
-    }
-  }
+	
+				if ($notify) { print OUT "NOTIFICATION(\"$sample - SplitNCigars complete\");\n";  }
+			} else {
+				if ($notify) { print OUT "NOTIFICATION(\"$sample - SplitNCigars previously completed\");\n";  }
+			}
+			
+			#GATK
+			$doesexist = (grep /GATK\/$_[0]_all.vcf/, (split("\n", `find ./`)))[0];
+			unless ($doesexist) {
+				print OUT "`java -jar $GATK -T HaplotypeCaller -R $REF -I aln_sorted_split.bam -o $_[0]_all.vcf`;\n";
+				if ($notify) { print OUT "NOTIFICATION(\"$sample - Haplotype caller complete\");\n";  }
+			} else {
+				if ($notify) { print OUT "NOTIFICATION(\"$sample - Haplotype caller previously completed\");\n";  }
+			}
+		}
+		else {  #working with DNA   
+			#GATK
+			$doesexist = (grep /GATK\/$_[0]_all.vcf/, (split("\n", `find ./`)))[0];
+			unless ($doesexist) {
+				print OUT "`java -jar $GATK -T HaplotypeCaller -R $REF -I aln_resorted_mdup.bam -o $_[0]_all.vcf`;\n";
+				print OUT "`java -jar $GATK -T HaplotypeCaller -R $REF -I aln_resorted_mdup.bam --emitRefConfidence GVCF -o $_[0]_all_emit.vcf`;\n";
+				if ($notify) { print OUT "NOTIFICATION(\"$sample - Haplotype caller complete\");\n";  }
+			} else {
+				if ($notify) { print OUT "NOTIFICATION(\"$sample - Haplotype caller previously completed\");\n";  }
+			}
+		}
+	} #end unless GATK is false
+	if($CONFIGURE{"RUNSAMTOOLS"} eq "true") {
+		print OUT '`mkdir -p $locale/variants/samtools`;',"\n",'chdir ("$locale/variants/samtools");',"\n";
+		
+		#SORT BAM
+		$doesexist = (grep /samtools\/aln_sorted.bam/, (split("\n", `find ./`)))[0];
+		unless ($doesexist) {
+		print OUT "`$SAMTOOLS sort $_[1] -o aln_sorted.bam`;\n";
+			if ($notify) { print OUT "NOTIFICATION(\"$sample - Sort Bam complete\");\n";  }
+		} else {
+			if ($notify) { print OUT "NOTIFICATION(\"$sample - Sort Bam previously completed\");\n";  }
+		}
+		
+		#variant call to BCF output
+		$doesexist = (grep /samtools\/$_[0]_all.bcf/, (split("\n", `find ./`)))[0];
+		unless ($doesexist) {
+		print OUT "`$SAMTOOLS mpileup -f $REF -g aln_sorted.bam > $_[0]_all.bcf`;\n";
+			if ($notify) { print OUT "NOTIFICATION(\"$sample - Variant call to BCF complete\");\n";  }
+		} else {
+			if ($notify) { print OUT "NOTIFICATION(\"$sample - Variant call to BCF previously completed\");\n";  }
+		}
+		
+		#convert to VCF
+		$doesexist = (grep /samtools\/$_[0]_all.vcf/, (split("\n", `find ./`)))[0];
+		unless ($doesexist) {
+		print OUT "`$BCFTOOLS view -vcg $_[0]_all.bcf > $_[0]_all.vcf`;\n";
+			if ($notify) { print OUT "NOTIFICATION(\"$sample - convert BCF to VCF complete\");\n";  }
+		} else {
+			if ($notify) { print OUT "NOTIFICATION(\"$sample - convert BCF to VCF  previously completed\");\n";  }
+		}
+	} #end unless SAMTOOLS is false
 }
 
 ## - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
