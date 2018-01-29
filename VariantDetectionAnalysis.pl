@@ -293,12 +293,14 @@ open (OUT, ">>$outted");
 print OUT "$codes\n";
 
   @eachread = split(/\s/, $reads);
-  foreach my $single (@eachread) {
+  foreach my $single (@eachread) { print $single;
     my $singlefolder = fileparse($single);
     if ($singlefolder =~ /fastq\.gz/) { $singlefolder =~ s/\.fastq\.gz/_fastqc/g; }
 		elsif ($singlefolder =~ /fastq$/) { $singlefolder =~ s/\.fastq/_fastqc/g; }
 		elsif ($singlefolder =~ /sam$/) { $singlefolder =~ s/\.sam/_fastqc/g; }
 		elsif ($singlefolder =~ /bam$/) { $singlefolder =~ s/\.bam/_fastqc/g; }
+		elsif ($singlefolder =~ /fq\.gz/) { $singlefolder =~ s/\.fq\.gz/_fastqc/g; }
+		elsif ($singlefolder =~ /fq$/) { $singlefolder =~ s/\.fq/_fastqc/g; }
 		else {die "Can't find fastq file type\n";}
     $doesexist = (grep /$singlefolder/, (split("\n", `find ./`)))[0];
     unless ($doesexist) {
@@ -312,6 +314,8 @@ if ($singlefolder =~ /fastq\.gz/) { $singlefolder =~ s/\.fastq\.gz/_fastqc/g; }
 elsif ($singlefolder =~ /fastq$/) { $singlefolder =~ s/\.fastq/_fastqc/g; }
 elsif ($singlefolder =~ /sam$/) { $singlefolder =~ s/\.sam/_fastqc/g; }
 elsif ($singlefolder =~ /bam$/) { $singlefolder =~ s/\.bam/_fastqc/g; }
+elsif ($singlefolder =~ /fq\.gz/) { $singlefolder =~ s/\.fq\.gz/_fastqc/g; }
+elsif ($singlefolder =~ /fq$/) { $singlefolder =~ s/\.fq/_fastqc/g; }
 else {die "Can't find fastq file type\n";}
 print OUT "$codes\n";
 $codes = <<"ENDCODES";
