@@ -16,7 +16,7 @@ our ($TOPHAT, $BOWTIE, $PICARD, $GATK, $HISAT, $FASTQC, $STAR, $SAMTOOLS, $BCFTO
 #files
 our ($value, %CONFIGURE, %FILE, @content, @arrayfile, @threads);
 #inputs
-our ($REF, $ANN, $outputfolder, $THREADS);
+our ($REF, $ANN, $ANNGTF, $outputfolder, $THREADS);
 our ($sample, $reads, $doesexist, @eachread, $codes, $outted, $newout);
 my ($email, $notify, $syntax); #notification options
 
@@ -45,7 +45,6 @@ INPUTFILES();
 chdir ("$outputfolder"); #working from the outputfolder;
 open(STDOUT, '>', "$outputfolder/$std_out") or die "Log file doesn't exist";
 open(STDERR, '>', "$outputfolder/$std_err") or die "Error file doesn't exist";
- 
 
 #EMAILS
 my $subject = "VAP-$date"; my $notification = $outputfolder."/".$subject.'.log';
@@ -134,11 +133,11 @@ if ($CONFIGURE{"FASTQ"} ne "false") {
     } #end sequence type
   } #end file
 } #end if fastq file
-elsif ( ($CONFIGURE{"BAM"} ne "false") || ($CONFIGURE{"SAM"} ne "false") ) { #if bam or sam file
+elsif ( ($CONFIGURE{"BAM"} ne "false") || ($CONFIGURE{"SAM"} ne "false") ) {#if bam or sam file
   my $nac = "RNA"; #default is RNA
   if ($CONFIGURE{"SAMPLEDNA"} eq "true") { $nac = "DNA"; } #if dna
   elsif ($CONFIGURE{"SAMPLERNA"} eq "true") { $nac = "RNA"; } #if rna
-  foreach (keys %FILE){
+  foreach (keys %FILE){ 
     if ($CONFIGURE{"RUNFASTQC"} eq "true"){
 			$newout = "$outputfolder/tmp/$_-fastqc.txt";
 			push @arrayfile, $newout;
@@ -152,7 +151,7 @@ elsif ( ($CONFIGURE{"BAM"} ne "false") || ($CONFIGURE{"SAM"} ne "false") ) { #if
 				open (OUT, ">$newout");
 				print OUT "#!/usr/bin/perl\n$endnotify\n"; close (OUT);
 				SAMBAM($_, $FILE{$_}, $newout, $nac);
-			} else {
+			} else { 
 				$newout = "$outputfolder/tmp/$_-bam.txt";
 				push @arrayfile, $newout;
 				open (OUT, ">$newout");
@@ -231,6 +230,7 @@ sub configureinput {
   $GATK=$CONFIGURE{"GATK"};
   $REF = $CONFIGURE{"GENOME"};
   $ANN = $CONFIGURE{"GFF"};
+  $ANNGTF = $CONFIGURE{"GTF"};
   if ($CONFIGURE{"THREADS"} > 1 ){ $THREADS = $CONFIGURE{"THREADS"};} else {$THREADS = 1;}
   $outputfolder = $CONFIGURE{"OUTPUTDIR"};
 }
@@ -384,17 +384,25 @@ print OUT "$codes\n";
   $doesexist = (grep /star\.bam/, (split("\n", `find ./`)))[0];
   unless ($doesexist) {
     @eachread = split(/\s/, $reads);
-    my $starstat = "$STAR --runThreadN $THREADS --genomeDir $CONFIGURE{'GENOMEDIR'} --outFileNamePrefix $sample. --readFilesIn ";
+    my $starstat = "mkdir -p 1PASS; cd 1PASS; $STAR --runThreadN $THREADS --genomeDir $CONFIGURE{'GENOMEDIR'} --readFilesCommand zcat --outFileNamePrefix $sample. --sjdbGTFfile $ANNGTF --readFilesIn ";
+    my $star2ref = "mkdir -p STARref; $STAR  --runThreadN $THREADS --runMode genomeGenerate --genomeDir STARref --genomeFastaFiles $REF --sjdbOverhang 49 --sjdbFileChrStartEnd SJ.out.tab";
+    my $star2pass = "mkdir -p 2PASS; cd 2PASS; $STAR --runThreadN $THREADS --genomeDir ../STARref --readFilesCommand zcat --outFileNamePrefix $sample.2. --sjdbGTFfile $ANNGTF --readFilesIn ";
     foreach my $single (@eachread) {
-      my $singlefolder = fileparse($single);
-      $singlefolder =~ s/q\.gz/q/g;
-      $starstat .= "$singlefolder ";
+      #my $singlefolder = fileparse($single);
+      #$singlefolder =~ s/q\.gz/q/g;
+      $star2pass .= "$single ";
+      $starstat .= "$single "; #folder ";
     }
 
 $codes = <<"ENDCODES";
-`cp $reads ./`;
-`gunzip *gz`;
-`$starstat`;
+#`cp $reads ./`;
+#`gunzip *gz`;
+`$starstat; cd ..`;
+`$star2ref`;
+`$star2pass; cd ..`;
+`cp 1PASS/$sample.Aligned.out.sam ./`;
+`cp 2PASS/$sample.2.Aligned.out.sam ./`;
+`$SAMTOOLS view -bS $sample.2.Aligned.out.sam -o $sample.2.star.bam`;
 `$SAMTOOLS view -bS $sample.Aligned.out.sam -o $sample.star.bam`;
 ENDCODES
 
@@ -404,6 +412,7 @@ print OUT "$codes\n";
   }
   close OUT;
   if ($CONFIGURE{"RUNVAP"} eq "true") {
+    VAP($_, "$outputfolder/$sample/star/$sample.2.star.bam", $outted, "RNA","$sample/star2");
     VAP($_, "$outputfolder/$sample/star/$sample.star.bam", $outted, "RNA","$sample/star");
   }
   
