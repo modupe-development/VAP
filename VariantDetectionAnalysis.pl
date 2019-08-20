@@ -42,8 +42,8 @@ open(STDERR, '>', "$std_err") or die "Error file doesn't exist";
 
 #Notification configuration
 my $subject = "VAP-$date"; my $notification = $outputfolder."/".$subject.'.log';
-if ((length($CONFIGURE{"SUBJECT"}) >= 1) || ($CONFIGURE{"SUBJECT"} =~ /false/)) { $subject = $CONFIGURE{"SUBJECT"}; }
-if ((length ($CONFIGURE{"EMAIL"}) >= 1) || ($CONFIGURE{"EMAIL"} =~ /false/)) {
+unless ((length($CONFIGURE{"SUBJECT"}) <= 1) || ($CONFIGURE{"SUBJECT"} =~ /false/)) { $subject = $CONFIGURE{"SUBJECT"}; }
+unless ((length ($CONFIGURE{"EMAIL"}) <= 1) || ($CONFIGURE{"EMAIL"} =~ /false/)) {
   $email = $CONFIGURE{"EMAIL"};
   $notify = "yes";
 my $welcome = <<"ENDWELCOME";
@@ -84,7 +84,7 @@ ENDNOTIFY
 ## - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 #PROCESSING
-if ($CONFIGURE{"FASTQ"} ne "false") {
+if ( (exists $CONFIGURE{"FASTQ"}) && ($CONFIGURE{"FASTQ"} ne "false") ) {
   my $testindex = `ls $CONFIGURE{"FASTQ"} | head -n 1`; chomp $testindex; 
   if (-e $testindex) {
     foreach (keys %FILE){
@@ -135,10 +135,9 @@ if ($CONFIGURE{"FASTQ"} ne "false") {
     } #end file
   } #end if file found
 } #end if fastq file
-elsif ( ($CONFIGURE{"BAM"} ne "false") || ($CONFIGURE{"SAM"} ne "false") ) {#if bam or sam file
+elsif ( (exists $CONFIGURE{"BAM"}) || (exists $CONFIGURE{"SAM"}) ) { #if bam or sam file
   my $nac = "RNA"; #default is RNA
   if ($CONFIGURE{"SAMPLEDNA"} eq "true") { $nac = "DNA"; } #if dna
-  elsif ($CONFIGURE{"SAMPLERNA"} eq "true") { $nac = "RNA"; } #if rna
   foreach (keys %FILE){ 
     if ($CONFIGURE{"RUNFASTQC"} eq "true"){
       $newout = "$outputfolder/tmp/$_-fastqc.txt";
@@ -146,26 +145,29 @@ elsif ( ($CONFIGURE{"BAM"} ne "false") || ($CONFIGURE{"SAM"} ne "false") ) {#if 
       open (OUT, ">$newout"); print OUT "#!/usr/bin/perl\n$endnotify\n"; close (OUT);
       FASTQC($_, $FILE{$_}, $newout);
     } #fastqc
+
     if ($CONFIGURE{"RUNVAP"} eq "true"){ #run variant analysis pipeline
-      if ($CONFIGURE{"SAM"} ne "false") { #if sam file
-        if (-e $CONFIGURE{"SAM"}) {
+      if ((exists $CONFIGURE{"SAM"}) && ($CONFIGURE{"SAM"} ne "false")) { #if sam file
+        my $testindex = `ls $CONFIGURE{"SAM"} | head -n 1`; chomp $testindex;
+        if (-e $testindex) {
           $newout = "$outputfolder/tmp/$_-sam.txt";
           push @arrayfile, $newout;
           open (OUT, ">$newout");
           print OUT "#!/usr/bin/perl\n$endnotify\n"; close (OUT);
           SAMBAM($_, $FILE{$_}, $newout, $nac);
-        }
-      } else { 
-        if (-e $CONFIGURE{"BAM"}) {
+        } 
+      } elsif ((exists $CONFIGURE{"BAM"}) && ($CONFIGURE{"BAM"} ne "false")) { #if bam file  
+       my $testindex = `ls $CONFIGURE{"BAM"} | head -n 1`; chomp $testindex;
+        if (-e $testindex) {
           $newout = "$outputfolder/tmp/$_-bam.txt";
           push @arrayfile, $newout;
           open (OUT, ">$newout");
           print OUT "#!/usr/bin/perl\n$endnotify\n"; close (OUT);
           VAP($_, $FILE{$_}, $newout,$nac, $_);
         } #end if file exist
-      } #end if sam or bam file
+      } #end if sam/bam 
     } #end if run vap
-  } # end file
+  } #end file
 } #end if bam or sam file
 
 my $queue = new Thread::Queue();
@@ -240,6 +242,7 @@ sub configureinput {
     chomp;
     unless ($_ =~ /^#/){
       if ($_ =~ /\=/){
+        $_ =~ tr/"//d; $_ =~ tr/'//d;
         $_ =~ /(\S+)\s*=\s*(\S+)/;
         my ($tool, $info) = (uc($1), $2);
         $CONFIGURE{$tool} = $info;
@@ -268,7 +271,7 @@ sub configureinput {
 
 sub INPUTFILES { #sorting the input files
   #FASTQ files and get basename if exist
-  unless ($CONFIGURE{"FASTQ"} eq "false") {
+  if ( (exists $CONFIGURE{"FASTQ"}) && ($CONFIGURE{"FASTQ"} ne "false") ) {
     @content = sort {$a <=> $b || $a cmp $b} (split("\n", `ls $CONFIGURE{"FASTQ"}`)); #get details of the folder
     foreach (@content) {
       my $file = basename($_);
@@ -289,14 +292,22 @@ sub INPUTFILES { #sorting the input files
       if (exists $FILE{$value}){ $FILE{$value} = "$FILE{$value} $_"; }
       else { $FILE{$value} = $_; }
     }
-  }
- #SAM/BAM files and get basename if exist
- if ( ($CONFIGURE{"BAM"} ne "false") || ($CONFIGURE{"SAM"} ne "false") ) {
-    if ($CONFIGURE{"BAM"} eq "false") {
-      @content = sort {$a <=> $b || $a cmp $b} (split("\n", `ls $CONFIGURE{"SAM"}`)); #get details of the folder
-    } else {
-      @content = sort {$a <=> $b || $a cmp $b} (split("\n", `ls $CONFIGURE{"BAM"}`)); #get details of the folder
+  } #end if fastq is specified
+  #SAM/BAM files and get basename if exist
+  elsif ( (exists $CONFIGURE{"BAM"}) && ($CONFIGURE{"BAM"} ne "false") ) {
+    @content = sort {$a <=> $b || $a cmp $b} (split("\n", `ls $CONFIGURE{"BAM"}`)); #get details of the folder
+    foreach (@content) {
+      my $file = basename($_);
+      if($file =~ /(.+)[\.]sam/) {
+         $value = $1;
+      } elsif($file =~ /(.+)[\.]bam/) {
+        $value = $1;
+      }
+      $FILE{$value} = $_;
     }
+  } # end if bam specified
+  elsif ( (exists $CONFIGURE{"SAM"}) && ($CONFIGURE{"SAM"} eq "false") ) {
+    @content = sort {$a <=> $b || $a cmp $b} (split("\n", `ls $CONFIGURE{"SAM"}`)); #get details of the folder
     foreach (@content) {
       my $file = basename($_);
       if($file =~ /(.+)[\.]sam/) {
@@ -306,13 +317,13 @@ sub INPUTFILES { #sorting the input files
       }
       $FILE{$value} = $_;
     }
-  }
+  } # end if sam specified
 } #end of subroutine: INPUTFILES
 
 
 sub FASTQC { #run fastqc
   ($sample, $reads, $outted) = @_;
-  chdir("$outputfolder"); print $sample;
+  chdir("$outputfolder"); 
   `mkdir -p $sample/fastqc`;
   chdir ("$sample/fastqc"); 
 
