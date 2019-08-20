@@ -6,14 +6,14 @@ Thanks for your interest in using the Variant Analysis Pipeline.
 
 ##Indexes of assembly and variant tools
 Before running the pipeline. Create indexes for the different assemblers specified
-**SYNTAXS:**
-- FASTA INDEX :
+**REFERENCE GENOME INDEX SYNTAXS:**
+- SAMTOOLS :
 ```
 	samtools faidx <reference.fa>
 ```
 - GATK : 
 ```
-	java -jar <picard directory>/picard.jar CreateSequenceDictionary R=<reference.fa> O=<dictionary.dict>
+	java -jar <picard directory>/picard.jar CreateSequenceDictionary R=<reference.fa> O=<reference.dict>
 ```
 - HISAT :
 ```
@@ -27,10 +27,7 @@ Before running the pipeline. Create indexes for the different assemblers specifi
 ```
 	bwa index <reference.fa> 
 ```
-- STAR :
-```
-	STAR --runMode genomeGenerate --genomeDir <path to reference.fa> --genomeFastaFiles <reference.fa> [--sjdbGTFfile <annotation [gff|gtf] file>] [--sjdbOverhang <reads average length if other than 100>]
-```
+
 _**N.B.** All ```<index_name>``` should be the same and stored in the ```<reference.fa>``` directory_
 
 ##Job File
@@ -41,5 +38,4 @@ e.g : SAM = false (this means there is no sam file) or input the file directory
 e.g : runTopHAT = true (this means the pipeline should run TopHAT
 
 ##To run workflow
-perl VariantAnalysisPipeline.pl -c custom_job.config
-
+perl VariantAnalysisPipeline.pl -c config_job.file
