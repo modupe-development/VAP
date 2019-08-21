@@ -1,4 +1,4 @@
-# _V_ariant _A_nalysis _P_ipeline
+# (V)ariant (A)nalysis (P)ipeline
 Thanks for your interest in using the Variant Analysis Pipeline.
 VAP is a comprehensive workflow for reference mapping and variant detection of genomic and transcriptomic reads using a suite of bioinformatics tools.
 
@@ -27,7 +27,7 @@ Bioinformatic tools are grouped based on sequencing reads
 	Contact maintainer to make custom changes to the different tools if needed.
 
 
-
+###
 ## Things to be aware of 
 
 ### Job File
@@ -73,6 +73,6 @@ The downstream step performs the following:
 1. Exploratory statistics of all variant files.
 
 
-
+###
 ## To run workflow
 perl VariantAnalysisPipeline.pl -c config_job.file
