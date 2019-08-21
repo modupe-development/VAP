@@ -1,17 +1,21 @@
-# _**V**_ariant _**A**_nalysis _**P**_ipeline
+# _V_ariant _A_nalysis _P_ipeline
 Thanks for your interest in using the Variant Analysis Pipeline.
 VAP is a comprehensive workflow for reference mapping and variant detection of genomic and transcriptomic reads using a suite of bioinformatics tools.
 
+
 ## Bioinformatic tools 
 Bioinformatic tools are grouped based on sequencing reads
+
 ### Genomic Sequencing 
 * BOWTIE2
 * BWA
+
 
 ### Transcriptomic Sequencing
 * TOPHAT2
 * STAR (2-PASS)
 * HISAT2
+
 
 ### Variant Calling (for both Genomic/Transcriptomic Sequencing)
 * PICARD + GATK HaplotypeCaller
@@ -22,7 +26,10 @@ Bioinformatic tools are grouped based on sequencing reads
 **N.B.** : parameters of all tools are set to default.
 	Contact maintainer to make custom changes to the different tools if needed.
 
+
+
 ## Things to be aware of 
+
 ### Job File
 * change **_config_job.file_** file with settings or renamed as required.
 * If parameters are not needed, they must be either removed or changed to *false*
@@ -51,6 +58,7 @@ Before running the pipeline. Create indexes for the different assemblers specifi
 ```
 _**N.B.** For easy use make sure all ```<index_name>``` should be the same and stored in the ```<reference.fa>``` directory_
 
+
 ### Downstream Merge and Filter Step (```runMergeFilter```)
 The downstream step performs the following:
 1. Merge SNPs from all variant calling tools initially specified to execute (_TopHAT2/HiSAT2/STAR_ or _BOWTIE/BWA_). 
@@ -63,6 +71,7 @@ The downstream step performs the following:
    1.   SnpCluster (3 SNPs in 35bp)
    1.   Mann-Whitney Rank-Sum (MQRankSum) < -12.5
 1. Exploratory statistics of all variant files.
+
 
 
 ## To run workflow
