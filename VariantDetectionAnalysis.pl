@@ -413,6 +413,7 @@ sub MERGE_FILTER { #run merge&filter
   unless (-e $GATK) { die "GATK tool path is incorrect, make sure the correct path is specified\n"; }
   chdir("$outputfolder"); 
   `mkdir -p $sample/MERGE_FILTER`;
+  `rm -rf $sample/MERGE_FILTER/*`;
   chdir ("$sample/MERGE_FILTER"); 
 
 #printing instructions in merge&filter job file
@@ -421,23 +422,26 @@ $codes = <<"ENDCODES";
 chdir("$outputfolder");
 `mkdir -p $sample/MERGE_FILTER`;
 chdir ("$sample/MERGE_FILTER");
-`rm -rf $sample/MERGE_FILTER/*`;
 ENDCODES
-
-  open (OUT, ">>$outted");
-  print OUT "$codes\n";
+  my $metafile = $sample."-summarystats.txt";
+  open (OUT, ">>$outted"); print OUT "$codes\n";
+  open (META,">",$metafile); print META "SAMPLE\tCLASS\tCOUNT\n";
   my $listof = `ls -1 $outputfolder/$sample/*/*/*snp.vcf`; chomp $listof;
-  my @alllist = split("\n", $listof); print @alllist;
+  my @alllist = split("\n", $listof); 
   if (-e $alllist[0]) { 
     my $combinesyntax = "java -jar $GATK -T CombineVariants -R $GATKREF";
-    my $newsample = $sample."-"."_merge-snp.vcf"; 
-    my $intersection = $sample."-"."_merge-intersect.vcf";
-    my $filtered = $sample."-"."_merge-filtered.vcf";
-    my $finalfilter = $sample."-"."_final-pass.vcf";
-
+    my $newsample = $sample."-"."merge-snp.vcf"; 
+    my $intersection = $sample."-"."merge-intersect.vcf";
+    my $filtered = $sample."-"."merge-filtered.vcf";
+    my $finalfilter = $sample."-"."final-pass.vcf";
+ 
     foreach (@alllist) { 
       my @esential = split("/", $_); 
-      $combinesyntax .= " --variant:$esential[-4] $_";
+      my $countsnps = `grep -v "^#" $_ | wc -l`; chomp $countsnps;
+      print META $sample."-$esential[-3]\tSNP\t".$countsnps."\n";
+      my $allvcf = $_; $allvcf =~ s/snp.vcf$/all.vcf/g; $countsnps = `grep -v "^#" $allvcf | wc -l`; chomp $countsnps; 
+      print META $sample."-$esential[-3]\tALL\t".$countsnps."\n";
+      $combinesyntax .= " --variant:$esential[-3] $_";
     }
     $combinesyntax .= " -o $newsample -genotypeMergeOptions UNIQUIFY";
     my $filtersyntax = "java -jar $GATK -T VariantFiltration -R $GATKREF -V $intersection -o $filtered ";
@@ -453,7 +457,9 @@ $codes =<<"ENDCODES";
 `$combinesyntax`;
 `grep -e "^#" -e "section" $newsample > $intersection`;
 `$filtersyntax`;
-open (COMM,"<", $filtered);
+open (COMM,"<$filtered");
+open (META,">>$metafile");
+print META "$sample"."-MERGE\\tSNP\\t".`grep -v "^#" $intersection | wc -l`;
 ENDCODES
 
     print OUT "$codes\n";
@@ -487,13 +493,14 @@ ENDCODES
 $codes=<<"ENDCODES";
 `mv tempfilter.txt $filtered`;
 `grep -e "^#" -e "PASS" $filtered > $finalfilter`;
-
+print META "$sample"."-PASSFILTER\\tSNP\\t".`grep -v "^#" $finalfilter | wc -l`;
+close META;
 ENDCODES
 
     print OUT "$codes\n";
     if ($notify) { print OUT "NOTIFICATION(\"$sample - Merge & Filter complete\");\n"; }  
   } #end if file exists
-  close OUT;
+  close OUT; close META;
 } #end of subroutine: MERGE_FILTER
 
 
@@ -555,7 +562,7 @@ ENDCODES
   open (OUT, ">>$outted");
   print OUT "$codes\n";
 
-  $doesexist = (grep /star\.bam/, (split("\n", `find ./`)))[0];
+  $doesexist = (grep /star\.sam/, (split("\n", `find ./`)))[0];
   unless ($doesexist) {
     @eachread = split(/\s/, $reads);
     my $addGTF=""; #making sure the GTF file is specified
@@ -578,7 +585,7 @@ $codes = <<"ENDCODES";
 `$starstat; cd ..`;
 `$star2ref`;
 `$star2pass; cd ..`;
-`cp 2PASS/$sample.2nd.Aligned.out.sam ./`;
+`cp 2PASS/$sample.2nd.Aligned.out.sam ./$sample.2nd.star.sam`;
 `$SAMBAM`;
 ENDCODES
 
@@ -588,7 +595,7 @@ ENDCODES
   } # end unless(doesexist)
   close OUT;
   if ($CONFIGURE{"RUNVAP"} eq "true") {
-    VAP($_, "../$sample.2nd.Aligned.out.sam", $outted, "RNA","$sample/star");
+    VAP($_, "../$sample.2nd.star.sam", $outted, "RNA","$sample/star");
   } # end if (parse to VAP)
 } #end of subroutine: STAR
 
@@ -616,7 +623,7 @@ ENDCODES
   print OUT "$codes\n";
  
   
-  $doesexist = (grep /hisat\.bam/, (split("\n", `find ./`)))[0];
+  $doesexist = (grep /hisat\.sam/, (split("\n", `find ./`)))[0];
   my $hisatstat;
   unless ($doesexist) {
     @eachread = split(/\s/, $reads);
@@ -663,7 +670,7 @@ ENDCODES
   open (OUT, ">>$outted");
   print OUT "$codes\n";
 
-  $doesexist = (grep /bwa\.bam/, (split("\n", `find ./`)))[0];
+  $doesexist = (grep /bwa\.sam/, (split("\n", `find ./`)))[0];
   unless ($doesexist) {
   if (-e $CONFIGURE{'SAMTOOLS'}) { $SAMBAM = "$CONFIGURE{'SAMTOOLS'} view -bS $sample.bwa.sam -o $sample.bwa.bam"; }
   else {$SAMBAM = ""; }
@@ -705,7 +712,7 @@ ENDCODES
   open (OUT, ">>$outted");
   print OUT "$codes\n";
 
-  $doesexist = (grep /bowtie\.bam/, (split("\n", `find ./`)))[0];
+  $doesexist = (grep /bowtie\.sam/, (split("\n", `find ./`)))[0];
   unless ($doesexist) {
     @eachread = split(/\s/, $reads);
     my $bowtiestat = "$BOWTIE -p $THREADS -x $newgenomeindex -S $sample.bowtie.sam -1 $eachread[0] -2 $eachread[1]";
