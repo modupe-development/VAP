@@ -10,8 +10,7 @@ HISAT = /path/to/hisat2
 BWA = /path/to/bwa/
 PICARD = /path/to/picard.jar
 GATK = /path/to/gatk.jar
-SAMTOOLS = /path/to/samtools
-BCFTOOLS = /path/to/bcftools
+SAMTOOLS = /path/to/samtools #optional
 FASTQC = /path/to/fastqc
 
 ######============ INPUT FILE OPTIONS ============######
@@ -42,11 +41,8 @@ runBOWTIE = false [or true] #only when sampleDNA=true
 
 #Housekeeping + VariantAnalysis 
 runFastqc = true [or false]
-runVAP = false [or false]
-
-#Variant Caller options
-runGATK = true [or false]
-runSAMTOOLS = true [or false]
+runVAP = true [or false]
+runMergeFilter = true [or false]
 
 ######=============== NOTIFICATION ===============######
 EMAIL= youremail@address.com
